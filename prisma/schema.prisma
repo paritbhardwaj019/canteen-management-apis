@@ -11,48 +11,57 @@ model RefreshToken {
   id        String   @id @default(uuid())
   token     String   @unique
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
   revoked   Boolean  @default(false)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("refresh_tokens")
 }
 
 model User {
-  id              String          @id @default(uuid())
-  email           String          @unique
-  password        String
-  firstName       String
-  lastName        String
-  role            Role            @relation(fields: [roleId], references: [id])
-  roleId          String
-  department      String?
-  isActive        Boolean         @default(true)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  mealRequests    MealRequest[]   @relation("EmployeeRequests")
-  approvedRequests MealRequest[]  @relation("ApproverRequests")
-  rejectedRequests MealRequest[]  @relation("RejectorRequests")
-  refreshTokens   RefreshToken[]
-  visitorProfile  VisitorProfile?
-  visitorRequests VisitorRequest[] @relation("VisitorRequestUser")
-  hostedVisitors  VisitorRequest[] @relation("VisitorRequestHost")
-  createdVisitors VisitorRequest[] @relation("VisitorRequestCreatedBy")
+  id               String           @id @default(uuid())
+  email            String           @unique
+  password         String
+  firstName        String
+  lastName         String
+  roleId           String
+  department       String?
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  isPlantHead      Boolean          @default(false)
+  plantId          String?
+  approvedRequests MealRequest[]    @relation("ApproverRequests")
+  rejectedRequests MealRequest[]    @relation("RejectorRequests")
+  mealRequests     MealRequest[]    @relation("EmployeeRequests")
+  headOfPlant      Plant?           @relation("PlantHeadRelation")
+  refreshTokens    RefreshToken[]
+  plant            Plant?           @relation("UserPlantRelation", fields: [plantId], references: [id])
+  role             Role             @relation(fields: [roleId], references: [id])
+  visitorProfile   VisitorProfile?
   approvedVisitors VisitorRequest[] @relation("VisitorRequestApprovedBy")
+  createdVisitors  VisitorRequest[] @relation("VisitorRequestCreatedBy")
+  hostedVisitors   VisitorRequest[] @relation("VisitorRequestHost")
+  visitorRequests  VisitorRequest[] @relation("VisitorRequestUser")
 
+  @@index([roleId], map: "users_roleId_fkey")
+  @@index([plantId], map: "users_plantId_fkey")
   @@map("users")
 }
+
+
 
 model Role {
   id          String       @id @default(uuid())
   name        String       @unique
   description String?
-  users       User[]
-  permissions Permission[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+  isPlantRole Boolean      @default(false)
+  users       User[]
+  permissions Permission[] @relation("PermissionToRole")
 
   @@map("roles")
 }
@@ -61,72 +70,63 @@ model Permission {
   id          String   @id @default(uuid())
   name        String   @unique
   description String?
-  roles       Role[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  roles       Role[]   @relation("PermissionToRole")
 
   @@map("permissions")
 }
 
 model Menu {
-  id          String   @id @default(uuid())
-  type        MealType
-  price       Int
+  id              String        @id @default(uuid())
+  type            MealType
+  price           Int
   empContribution Int
   emrContribution Int
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-model Meal {
-  id           String        @id @default(uuid())
-  name         String
-  description  String?
-  type         MealType
-  menuId       String
-  price        Float
-  isAvailable  Boolean       @default(true)
-  mealRequests MealRequest[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-
-  @@map("meals")
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  name            String        @default("Veg Meal")
+  mealRequests    MealRequest[]
 }
 
 model MealRequest {
-  id              String        @id @default(uuid())
-  user            User          @relation("EmployeeRequests", fields: [userId], references: [id])
-  userId          String
-  meal            Meal          @relation(fields: [mealId], references: [id])
-  mealId          String
-  date            DateTime
-  quantity        Int           @default(1)
-  totalPrice      Float?
-  notes           String?
-  status          RequestStatus @default(PENDING)
-  approvedBy      String?
-  approver        User?         @relation("ApproverRequests", fields: [approvedBy], references: [id])
-  approvedAt      DateTime?
-  rejectedBy      String?
-  rejector        User?         @relation("RejectorRequests", fields: [rejectedBy], references: [id])
-  rejectedAt      DateTime?
-  cancelledAt     DateTime?
-  completedAt     DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id          String        @id @default(uuid())
+  userId      String
+  date        DateTime
+  quantity    Int           @default(1)
+  totalPrice  Float?
+  notes       String?
+  status      RequestStatus @default(PENDING)
+  approvedBy  String?
+  approvedAt  DateTime?
+  rejectedBy  String?
+  rejectedAt  DateTime?
+  cancelledAt DateTime?
+  completedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  menuId      String
+  approver    User?         @relation("ApproverRequests", fields: [approvedBy], references: [id])
+  menu        Menu          @relation(fields: [menuId], references: [id])
+  rejector    User?         @relation("RejectorRequests", fields: [rejectedBy], references: [id])
+  user        User          @relation("EmployeeRequests", fields: [userId], references: [id])
 
+  @@index([approvedBy], map: "meal_requests_approvedBy_fkey")
+  @@index([menuId], map: "meal_requests_menuId_fkey")
+  @@index([rejectedBy], map: "meal_requests_rejectedBy_fkey")
+  @@index([userId], map: "meal_requests_userId_fkey")
   @@map("meal_requests")
 }
 
 model VisitorProfile {
   id            String   @id @default(uuid())
   userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   contactNumber String?
   company       String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("visitor_profiles")
 }
@@ -134,9 +134,7 @@ model VisitorProfile {
 model VisitorRequest {
   id            String         @id @default(uuid())
   userId        String
-  user          User           @relation("VisitorRequestUser", fields: [userId], references: [id])
   hostId        String
-  host          User           @relation("VisitorRequestHost", fields: [hostId], references: [id])
   purpose       String?
   company       String?
   contactNumber String?
@@ -144,31 +142,52 @@ model VisitorRequest {
   ticketId      String         @unique
   status        VisitorStatus  @default(PENDING)
   remarks       String?
-  
   createdById   String
-  createdBy     User           @relation("VisitorRequestCreatedBy", fields: [createdById], references: [id])
   approvedById  String?
-  approvedBy    User?          @relation("VisitorRequestApprovedBy", fields: [approvedById], references: [id])
   approvedAt    DateTime?
-  
-  entries       VisitorEntry[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+  entries       VisitorEntry[]
+  approvedBy    User?          @relation("VisitorRequestApprovedBy", fields: [approvedById], references: [id])
+  createdBy     User           @relation("VisitorRequestCreatedBy", fields: [createdById], references: [id])
+  host          User           @relation("VisitorRequestHost", fields: [hostId], references: [id])
+  user          User           @relation("VisitorRequestUser", fields: [userId], references: [id])
 
+  @@index([approvedById], map: "visitor_requests_approvedById_fkey")
+  @@index([createdById], map: "visitor_requests_createdById_fkey")
+  @@index([hostId], map: "visitor_requests_hostId_fkey")
+  @@index([userId], map: "visitor_requests_userId_fkey")
   @@map("visitor_requests")
 }
 
 model VisitorEntry {
-  id               String        @id @default(uuid())
+  id               String         @id @default(uuid())
   visitorRequestId String
-  visitorRequest   VisitorRequest @relation(fields: [visitorRequestId], references: [id])
   entryDate        DateTime
   entryTime        DateTime
   exitTime         DateTime?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  visitorRequest   VisitorRequest @relation(fields: [visitorRequestId], references: [id])
 
+  @@index([visitorRequestId], map: "visitor_entries_visitorRequestId_fkey")
   @@map("visitor_entries")
+}
+
+model Plant {
+  id           String   @id @default(uuid())
+  name         String
+  plantCode    String   @unique
+  location     String?
+  serialNumber String?
+  deviceName   String?
+  plantHeadId  String?  @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  plantHead    User?    @relation("PlantHeadRelation", fields: [plantHeadId], references: [id])
+  users        User[]   @relation("UserPlantRelation")
+
+  @@map("plants")
 }
 
 enum VisitorStatus {

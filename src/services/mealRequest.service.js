@@ -1,5 +1,6 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
+const { getMealRequestColumns } = require("../utils/columnModles");
 const {
   notFound,
   badRequest,
@@ -7,49 +8,62 @@ const {
   forbidden,
 } = require("../utils/api.error");
 
+
 const createMealRequest = async (requestData, userId) => {
-  const { mealId, date, quantity = 1, notes } = requestData;
-
-  const meal = await prisma.meal.findUnique({
-    where: { id: mealId },
+  const { 
+    menuId, 
+    date, 
+    quantity = 1, 
+    notes,
+    employeeName,
+    employeeCode 
+  } = requestData;
+  
+  // Validate menu
+  const menu = await prisma.menu.findUnique({
+    where: { id: menuId },
   });
 
-  if (!meal) {
-    throw notFound("Meal not found");
+  if (!menu) {
+    throw notFound("Menu not found");
   }
 
-  if (!meal.isAvailable) {
-    throw badRequest("This meal is currently unavailable");
-  }
-
-  const requestDate = new Date(date);
-
-  const existingRequest = await prisma.mealRequest.findFirst({
-    where: {
-      userId: userId,
-      mealId: mealId,
-      date: {
-        gte: new Date(requestDate.setHours(0, 0, 0, 0)),
-        lt: new Date(requestDate.setHours(23, 59, 59, 999)),
-      },
-      status: { in: ["PENDING", "APPROVED"] },
-    },
-  });
-
-  if (existingRequest) {
-    throw conflict(
-      "You already have a pending or approved request for this meal on this date"
-    );
-  }
-
-  // Get user's role to check if auto-approval is needed
+  // Get user's information
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: { role: true },
   });
 
-  // Auto-approve for employees
+  if (!user) {
+    throw notFound("User not found");
+  }
+
+  // Determine if the user is an employee
   const isEmployee = user?.role?.name === "Employee";
+  
+  // Use today's date if no date is provided
+  const requestDate = date ? new Date(date) : new Date();
+  
+  // Check for existing request
+  const existingRequest = await prisma.mealRequest.findFirst({
+    where: {
+      userId: userId,
+      menuId: menuId,
+      date: {
+        gte: new Date(new Date(requestDate).setHours(0, 0, 0, 0)),
+        lt: new Date(new Date(requestDate).setHours(23, 59, 59, 999)),
+      },
+      status: "APPROVED",
+    },
+  });
+
+  if (existingRequest) {
+    throw conflict(
+      "Your request is already submitted"
+    );
+  }
+
+  // Auto-approve for employees
   const initialStatus = isEmployee ? "APPROVED" : "PENDING";
   const approvalData = isEmployee
     ? {
@@ -58,15 +72,27 @@ const createMealRequest = async (requestData, userId) => {
       }
     : {};
 
+  // Determine employee details
+  // If user is an employee, use their own details
+  // If not, use provided details or fallback to the user's details
+  const actualEmployeeName = isEmployee 
+    ? `${user.firstName} ${user.lastName}`.trim()
+    : employeeName || `${user.firstName} ${user.lastName}`.trim();
+    
+  const actualEmployeeCode = isEmployee 
+    ? userId 
+    : employeeCode || userId;
+
+    console.log(actualEmployeeName, actualEmployeeCode);
   return await prisma.mealRequest.create({
     data: {
       userId: userId,
-      mealId: mealId,
-      date: new Date(date),
+      menuId: menuId,
+      date: requestDate,
       quantity,
       notes,
       status: initialStatus,
-      totalPrice: meal.price * quantity,
+      totalPrice: menu.price * quantity,
       ...approvalData,
     },
     include: {
@@ -78,7 +104,7 @@ const createMealRequest = async (requestData, userId) => {
           email: true,
         },
       },
-      meal: true,
+      menu: true,
     },
   });
 };
@@ -103,20 +129,34 @@ const getAllMealRequests = async (filters, userId, permissions, userRole) => {
     where.status = status;
   }
 
+  // Date filtering logic
   if (date) {
+    // If specific date is provided, get records for that day only
     const requestDate = new Date(date);
     where.date = {
-      gte: new Date(requestDate.setHours(0, 0, 0, 0)),
-      lt: new Date(requestDate.setHours(23, 59, 59, 999)),
+      gte: new Date(new Date(requestDate).setHours(0, 0, 0, 0)),
+      lt: new Date(new Date(requestDate).setHours(23, 59, 59, 999)),
     };
   } else if (from && to) {
+    // If both from and to are provided, get records between these dates
     where.date = {
-      gte: new Date(from),
-      lte: new Date(to),
+      gte: new Date(new Date(from).setHours(0, 0, 0, 0)),
+      lte: new Date(new Date(to).setHours(23, 59, 59, 999)),
+    };
+  } else if (from && !to) {
+    // If only from date is provided, get records for that day only
+    where.date = {
+      gte: new Date(new Date(from).setHours(0, 0, 0, 0)),
+      lt: new Date(new Date(from).setHours(23, 59, 59, 999)),
+    };
+  } else if (!from && to) {
+    // If only to date is provided, get all records up to (and including) that day
+    where.date = {
+      lte: new Date(new Date(to).setHours(23, 59, 59, 999)),
     };
   }
 
-  return await prisma.mealRequest.findMany({
+  const data = await prisma.mealRequest.findMany({
     where,
     include: {
       user: {
@@ -124,15 +164,31 @@ const getAllMealRequests = async (filters, userId, permissions, userRole) => {
           id: true,
           firstName: true,
           lastName: true,
-          email: true,
         },
       },
-      meal: true,
+      menu: true,
     },
     orderBy: {
       createdAt: "desc",
     },
   });
+
+  let summary = data.reduce((acc, request) => {
+    acc[request.status] = (acc[request.status] || 0) + 1;
+    return acc;
+  }, {});
+  
+  summary.total = data.length;
+  summary.from = from;
+  summary.to = to;
+  
+  console.log(summary);
+  
+  return {
+    data,
+    summary,
+    columns: getMealRequestColumns(userRole),
+  };
 };
 
 const getMealRequestById = async (id, userId, permissions) => {
@@ -147,7 +203,7 @@ const getMealRequestById = async (id, userId, permissions) => {
           email: true,
         },
       },
-      meal: true,
+      menu: true,
     },
   });
 
@@ -170,7 +226,7 @@ const updateMealRequest = async (id, requestData, userId, permissions) => {
   const existingRequest = await prisma.mealRequest.findUnique({
     where: { id },
     include: {
-      meal: true,
+      menu: true,
     },
   });
 
@@ -257,7 +313,7 @@ const updateMealRequest = async (id, requestData, userId, permissions) => {
           email: true,
         },
       },
-      meal: true,
+      menu: true,
     },
   });
 };
@@ -299,7 +355,7 @@ const cancelMealRequest = async (id, userId, permissions) => {
           email: true,
         },
       },
-      meal: true,
+      menu: true,
     },
   });
 };
@@ -325,13 +381,28 @@ const deleteMealRequest = async (id, userId, permissions) => {
 };
 
 const getMealRequestSummary = async (filters) => {
+  console.log(filters);
   const { from, to } = filters;
 
   const dateFilter = {};
+  
+  // Enhanced date filtering logic
   if (from && to) {
+    // If both from and to are provided, get records between these dates
     dateFilter.date = {
-      gte: new Date(from),
-      lte: new Date(to),
+      gte: new Date(new Date(from).setHours(0, 0, 0, 0)),
+      lte: new Date(new Date(to).setHours(23, 59, 59, 999)),
+    };
+  } else if (from && !to) {
+    // If only from date is provided, get records for that day only
+    dateFilter.date = {
+      gte: new Date(new Date(from).setHours(0, 0, 0, 0)),
+      lt: new Date(new Date(from).setHours(23, 59, 59, 999)),
+    };
+  } else if (!from && to) {
+    // If only to date is provided, get all records up to (and including) that day
+    dateFilter.date = {
+      lte: new Date(new Date(to).setHours(23, 59, 59, 999)),
     };
   }
 
@@ -346,20 +417,20 @@ const getMealRequestSummary = async (filters) => {
   const mealRequests = await prisma.mealRequest.findMany({
     where: dateFilter,
     include: {
-      meal: true,
+      menu: true,
     },
   });
 
   const mealTypeCounts = {};
   mealRequests.forEach((request) => {
-    const type = request.meal.type.toLowerCase();
+    const type = request.menu.type.toLowerCase();
     mealTypeCounts[type] = (mealTypeCounts[type] || 0) + 1;
   });
 
   const approvedRequests = await prisma.mealRequest.findMany({
     where: {
       ...dateFilter,
-      status: { in: ["APPROVED", "COMPLETED"] },
+      status: "COMPLETED",
     },
   });
 
@@ -375,6 +446,11 @@ const getMealRequestSummary = async (filters) => {
     }, {}),
     byMealType: mealTypeCounts,
     totalApprovedAmount,
+    totalRequests: mealRequests.length,
+    dateRange: {
+      from: from || null,
+      to: to || null
+    }
   };
 };
 

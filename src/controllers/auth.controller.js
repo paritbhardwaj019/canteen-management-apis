@@ -3,6 +3,25 @@ const asyncHandler = require("../utils/async.handler");
 const { badRequest } = require("../utils/api.error");
 const ApiResponse = require("../utils/api.response");
 
+// register a new employee
+const registerEmployee = asyncHandler(async (req, res) => {
+  const { email, password, name, roleId, startDate, endDate, empCode } = req.body;
+
+  const result = await authService.registerEmployee({
+    email,
+    name,
+    roleId,
+    startDate,
+    endDate,
+    empCode,
+  });
+
+  return ApiResponse.created(res, "Employee registered successfully", {
+    employee: result.employee,
+    accessToken: result.accessToken,
+    refreshToken: result.refreshToken,
+  });
+});
 /**
  * Register a new user
  */
@@ -142,4 +161,5 @@ module.exports = {
   logout,
   logoutAll,
   getProfile,
+  registerEmployee,
 };

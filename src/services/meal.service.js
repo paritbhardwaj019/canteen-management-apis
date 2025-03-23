@@ -1,5 +1,6 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
+const { getMenuColumns } = require("../utils/columnModles");
 const { notFound, conflict } = require("../utils/api.error");
 
 /**
@@ -54,7 +55,7 @@ const getAllMeals = async (filters = {}) => {
     where.isAvailable = isAvailable === "true" || isAvailable === true;
   }
 
-  return await prisma.meal.findMany({
+  const data =  await prisma.meal.findMany({
     where,
     include: {
       menu: true,
@@ -63,6 +64,12 @@ const getAllMeals = async (filters = {}) => {
       name: "asc",
     },
   });
+  const userRole = req.user.role;
+
+  return {
+    data,
+    columns: getMenuColumns(userRole),
+  };
 };
 
 /**
@@ -176,8 +183,13 @@ const createMenu = async (menuData) => {
   });
 };
 
-const getAllMenus = async () => {
-  return await prisma.menu.findMany();
+const getAllMenus = async (userRole) => {
+
+  const data = await prisma.menu.findMany();
+  return {
+    data,
+    columns: getMenuColumns(userRole),
+  };
 };
 const updateMenu = async (id, menuData) => {
   const { type, price, empContribution } = menuData;

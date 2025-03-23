@@ -7,7 +7,7 @@ router.post("/register", authController.register);
 router.post("/login", authController.login);
 router.post("/refresh-token", authController.refreshAccessToken);
 router.post("/logout", authController.logout);
-
+router.post("/register-employee", authController.registerEmployee);
 router.get("/profile", authenticate, authController.getProfile);
 router.post("/logout-all", authenticate, authController.logoutAll);
 

@@ -99,7 +99,7 @@ const createMenu = asyncHandler(async (req, res) => {
 });
 
 const getAllMenus = asyncHandler(async (req, res) => {
-  const menus = await mealService.getAllMenus();
+  const menus = await mealService.getAllMenus(req.user.role);
   return ApiResponse.collection(res, "Menus retrieved successfully", menus);
 });
 

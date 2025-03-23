@@ -15,14 +15,56 @@ const {
   forbidden,
 } = require("../utils/api.error");
 
+// register a new employee
+const registerEmployee = async (userData) => {
+  const { email, password, name, roleId, startDate, endDate, empCode } = userData;
+  const existingEmployee = await prisma.employee.findUnique({
+    where: { email: email, empCode: empCode },
+  });
+  if(existingEmployee){
+    throw new ApiError(409, "Employee with this email already exists");
+  }
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const newEmployee = await prisma.employee.create({
+    data: {
+      email,
+      password: hashedPassword,
+      name, 
+      empCode,
+      startDate,
+      endDate,
+      roleId : "cac87de3-96f9-4486-892f-27299fd6fa5b",
+    },
+  });
+
+  // Generate tokens
+  const accessToken = generateAccessToken({
+    userId: newEmployee.id,
+    email: newEmployee.email,
+    role: newEmployee.role.name,
+  });
+
+  const refreshTokenObj = await generateRefreshToken(newEmployee.id);
+
+  // Return user data without password
+  const { password: _, ...employeeWithoutPassword } = newEmployee;
+
+  return {
+    employee: employeeWithoutPassword,
+    accessToken,
+    refreshToken: refreshTokenObj.token, // Return just the token string
+    refreshTokenExpiry: refreshTokenObj.expiresAt, // Optionally include expiry
+  };
+};
+
 /**
  * Register a new user
  * @param {Object} userData - User registration data
  * @returns {Object} Newly created user, access token and refresh token
  */
 const register = async (userData) => {
-  const { email, password, firstName, lastName, roleId, department } = userData;
-
+  const { email, password, firstName, lastName, roleId, department, type } = userData;
+ 
   // Check if user already exists
   const existingUser = await prisma.user.findUnique({
     where: { email },
@@ -186,4 +228,5 @@ module.exports = {
   refreshToken,
   logout,
   logoutAll,
+  registerEmployee,
 };

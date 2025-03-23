@@ -11,23 +11,17 @@ const isValidDate = (dateString) => {
 };
 
 const createMealRequest = asyncHandler(async (req, res) => {
-  const { mealId, date, quantity, notes } = req.body;
+  const { menuId } = req.body;
   const userId = req.user.id;
 
-  if (!mealId || !date) {
-    throw badRequest("Meal ID and date are required");
+  if (!menuId) {
+    throw badRequest("Menu ID is  required");
   }
 
-  if (!isValidDate(date)) {
-    throw badRequest("Invalid date format. Use YYYY-MM-DD format");
-  }
 
   const newRequest = await mealRequestService.createMealRequest(
     {
-      mealId,
-      date,
-      quantity: quantity || 1,
-      notes,
+      menuId
     },
     userId
   );
@@ -44,23 +38,24 @@ const getAllMealRequests = asyncHandler(async (req, res) => {
   const currentUserId = req.user.id;
   const permissions = req.user.permissions || [];
 
-  const requests = await mealRequestService.getAllMealRequests(
+  const data = await mealRequestService.getAllMealRequests(
     {
       status,
       userId,
       date,
       from,
-      to,
+      to
     },
     currentUserId,
     permissions,
     req.user.role
   );
 
-  return ApiResponse.collection(
+  return ApiResponse.ok(
+    
     res,
     "Meal requests retrieved successfully",
-    requests
+    data
   );
 });
 
