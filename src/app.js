@@ -17,6 +17,7 @@ const permissionRoutes = require("./routes/v1/permission.routes");
 const visitorRoutes = require("./routes/v1/visitor.routes");
 const visitorAuthRoutes = require("./routes/v1/visitorAuth.routes");
 const canteenRoutes = require("./routes/v1/canteen.routes");
+const plantRoutes = require("./routes/v1/plant.routes");
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.use(`${apiPrefix}/permissions`, permissionRoutes);
 app.use(`${apiPrefix}/visitors`, visitorRoutes);
 app.use(`${apiPrefix}/visitor-auth`, visitorAuthRoutes);
 app.use(`${apiPrefix}/canteen`, canteenRoutes);
+app.use(`${apiPrefix}/plants`, plantRoutes);
 
 app.get(`${apiPrefix}/health`, (req, res) => {
   res.status(200).json({

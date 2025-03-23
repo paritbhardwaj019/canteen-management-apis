@@ -11,10 +11,10 @@ model RefreshToken {
   id        String   @id @default(uuid())
   token     String   @unique
   userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
   revoked   Boolean  @default(false)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("refresh_tokens")
@@ -45,13 +45,13 @@ model User {
   createdVisitors  VisitorRequest[] @relation("VisitorRequestCreatedBy")
   hostedVisitors   VisitorRequest[] @relation("VisitorRequestHost")
   visitorRequests  VisitorRequest[] @relation("VisitorRequestUser")
+  createdPlants    Plant[]          @relation("PlantCreatedBy")
+  updatedPlants    Plant[]          @relation("PlantUpdatedBy")
 
   @@index([roleId], map: "users_roleId_fkey")
   @@index([plantId], map: "users_plantId_fkey")
   @@map("users")
 }
-
-
 
 model Role {
   id          String       @id @default(uuid())
@@ -75,6 +75,28 @@ model Permission {
   roles       Role[]   @relation("PermissionToRole")
 
   @@map("permissions")
+}
+
+model Plant {
+  id           String   @id @default(uuid())
+  name         String
+  plantCode    String   @unique
+  location     String?
+  serialNumber String?
+  deviceName   String?
+  plantHeadId  String?  @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  plantHead    User?    @relation("PlantHeadRelation", fields: [plantHeadId], references: [id])
+  users        User[]   @relation("UserPlantRelation")
+  
+  createdById  String?
+  createdBy    User?    @relation("PlantCreatedBy", fields: [createdById], references: [id])
+  updatedById  String?
+  updatedBy    User?    @relation("PlantUpdatedBy", fields: [updatedById], references: [id])
+
+  @@map("plants")
 }
 
 model Menu {
@@ -174,22 +196,6 @@ model VisitorEntry {
   @@map("visitor_entries")
 }
 
-model Plant {
-  id           String   @id @default(uuid())
-  name         String
-  plantCode    String   @unique
-  location     String?
-  serialNumber String?
-  deviceName   String?
-  plantHeadId  String?  @unique
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  plantHead    User?    @relation("PlantHeadRelation", fields: [plantHeadId], references: [id])
-  users        User[]   @relation("UserPlantRelation")
-
-  @@map("plants")
-}
-
 enum VisitorStatus {
   PENDING
   APPROVED
@@ -208,5 +214,5 @@ enum RequestStatus {
   APPROVED
   REJECTED
   CANCELLED
-  COMPLETED
+  CONSUMED
 }
