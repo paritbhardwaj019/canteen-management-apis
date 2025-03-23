@@ -38,6 +38,18 @@ const config = {
     username: process.env.ESSL_USERNAME,
     password: process.env.ESSL_PASSWORD,
   },
+
+  cloudinary: {
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+    folder: process.env.CLOUDINARY_FOLDER,
+  },
+
+  upload: {
+    maxFileSize: process.env.MAX_FILE_SIZE || 5 * 1024 * 1024,
+    allowedFormats: ["jpg", "jpeg", "png", "pdf"],
+  },
 };
 
 module.exports = config;
