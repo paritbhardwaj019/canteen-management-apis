@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  revoked   Boolean  @default(false)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model User {
+  id              String        @id @default(uuid())
+  email           String        @unique
+  password        String
+  firstName       String
+  lastName        String
+  role            Role          @relation(fields: [roleId], references: [id])
+  roleId          String
+  department      String?
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  mealRequests    MealRequest[] @relation("EmployeeRequests")
+  approvedRequests MealRequest[] @relation("ApproverRequests")
+  rejectedRequests MealRequest[] @relation("RejectorRequests")
+  refreshTokens   RefreshToken[]
+
+  @@map("users")
+}
+
+model Role {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  description String?
+  users       User[]
+  permissions Permission[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  roles       Role[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("permissions")
+}
+
+model Menu {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  meals       Meal[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("menus")
+}
+
+model Meal {
+  id           String        @id @default(uuid())
+  name         String
+  description  String?
+  type         MealType
+  menu         Menu          @relation(fields: [menuId], references: [id])
+  menuId       String
+  price        Float
+  isAvailable  Boolean       @default(true)
+  mealRequests MealRequest[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("meals")
+}
+
+model MealRequest {
+  id              String        @id @default(uuid())
+  user            User          @relation("EmployeeRequests", fields: [userId], references: [id])
+  userId          String
+  meal            Meal          @relation(fields: [mealId], references: [id])
+  mealId          String
+  date            DateTime
+  quantity        Int           @default(1)
+  totalPrice      Float?
+  notes           String?
+  status          RequestStatus @default(PENDING)
+  approvedBy      String?
+  approver        User?         @relation("ApproverRequests", fields: [approvedBy], references: [id])
+  approvedAt      DateTime?
+  rejectedBy      String?
+  rejector        User?         @relation("RejectorRequests", fields: [rejectedBy], references: [id])
+  rejectedAt      DateTime?
+  cancelledAt     DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("meal_requests")
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
