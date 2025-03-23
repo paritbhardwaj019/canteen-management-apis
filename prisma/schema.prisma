@@ -70,14 +70,13 @@ model Permission {
 
 model Menu {
   id          String   @id @default(uuid())
-  name        String
-  description String?
+  type        MealType
+  price       Int
+  empContribution Int
+  emrContribution Int
   isActive    Boolean  @default(true)
-  meals       Meal[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  @@map("menus")
 }
 
 model Meal {
@@ -85,7 +84,6 @@ model Meal {
   name         String
   description  String?
   type         MealType
-  menu         Menu          @relation(fields: [menuId], references: [id])
   menuId       String
   price        Float
   isAvailable  Boolean       @default(true)

@@ -89,10 +89,47 @@ const deleteMeal = asyncHandler(async (req, res) => {
   return ApiResponse.ok(res, "Meal deleted successfully");
 });
 
+
+// menu creation and handling
+
+const createMenu = asyncHandler(async (req, res) => {
+
+  const menu = await mealService.createMenu(req.body);
+  return ApiResponse.created(res, "Menu created successfully", menu);
+});
+
+const getAllMenus = asyncHandler(async (req, res) => {
+  const menus = await mealService.getAllMenus();
+  return ApiResponse.collection(res, "Menus retrieved successfully", menus);
+});
+
+const updateMenu = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const menu = await mealService.updateMenu(id, req.body);
+  return ApiResponse.ok(res, "Menu updated successfully", menu);
+});
+
+const deleteMenu = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  await mealService.deleteMenu(id);
+  return ApiResponse.ok(res, "Menu deleted successfully");
+});
+
+
+
+
+
+
+
 module.exports = {
   createMeal,
   getAllMeals,
   getMealById,
   updateMeal,
   deleteMeal,
+  createMenu,
+  getAllMenus,
+  updateMenu,
+  deleteMenu,
 };

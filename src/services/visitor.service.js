@@ -41,26 +41,9 @@ const generateQRCode = async (ticketId) => {
  * @param {String} userId - User ID of the person registering the visitor request
  * @returns {Object} Visitor request details with ticket ID and QR code
  */
+
 const registerVisitorRequest = async (visitorData, userId, files) => {
-  if (!visitorData.visitorId || !visitorData.purpose) {
-    throw badRequest("Visitor ID and purpose are required");
-  }
-
-  // Check if visitor exists
-  const visitor = await prisma.user.findUnique({
-    where: { id: visitorData.visitorId },
-    include: {
-      role: true,
-    },
-  });
-
-  if (!visitor) {
-    throw notFound("Visitor not found");
-  }
-
-  if (visitor.role.name !== "Visitor") {
-    throw badRequest("The provided ID does not belong to a visitor");
-  }
+  console.log(visitorData, userId, files);
 
   const ticketId = generateTicketId();
   const visitDate = visitorData.visitDate
@@ -70,15 +53,17 @@ const registerVisitorRequest = async (visitorData, userId, files) => {
   // Create visitor request in database
   const visitorRequest = await prisma.visitorRequest.create({
     data: {
-      userId: visitorData.visitorId,
-      hostId: visitorData.hostId || userId, // Default to current user if no host specified
+    
+      
+      userId: visitorData.hostId,
+      hostId: visitorData.hostId, 
       purpose: visitorData.purpose,
       company: visitorData.company,
       contactNumber: visitorData.contact,
       visitDate,
       ticketId,
       status: "PENDING",
-      createdById: userId,
+      createdById: visitorData.hostId,
     },
     include: {
       user: {

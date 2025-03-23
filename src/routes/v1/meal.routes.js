@@ -21,4 +21,12 @@ router.delete(
   mealController.deleteMeal
 );
 
+
+// menu creation and handling
+
+router.get("/menu/all", mealController.getAllMenus);
+router.post("/menu/add",  mealController.createMenu);
+router.put("/menu/:id",  mealController.updateMenu);
+router.delete("/menu/:id", mealController.deleteMenu);
+
 module.exports = router;

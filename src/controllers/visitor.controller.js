@@ -2,20 +2,21 @@ const visitorService = require("../services/visitor.service");
 const asyncHandler = require("../utils/async.handler");
 const { badRequest } = require("../utils/api.error");
 const ApiResponse = require("../utils/api.response");
+const { v4: uuidv4 } = require("uuid");
 
 /**
  * Register a new visitor request
  */
 const registerVisitorRequest = asyncHandler(async (req, res) => {
-  const { visitorId, purpose, company, contact, hostId, visitDate } = req.body;
-
-  const actualVisitorId = req.user.role === "Visitor" ? req.user.id : visitorId;
-
-  if ((!actualVisitorId || !purpose) && req.user.role !== "Visitor") {
-    throw badRequest("Visitor ID and purpose are required");
-  } else if (!purpose && req.user.role === "Visitor") {
-    throw badRequest("Purpose is required");
-  }
+  const { purpose, company, contact, visitDate, email, firstName, lastName } = req.body;
+console.log(req.user)
+  const actualVisitorId = "vis-" + uuidv4().slice(0, 12);
+  console.log(actualVisitorId);
+  // if ((!actualVisitorId || !purpose) && req.user.role !== "Visitor") {
+  //   throw badRequest("Visitor ID and purpose are required");
+  // } else if (!purpose && req.user.role === "Visitor") {
+  //   throw badRequest("Purpose is required");
+  // }
 
   const result = await visitorService.registerVisitorRequest(
     {
@@ -23,8 +24,11 @@ const registerVisitorRequest = asyncHandler(async (req, res) => {
       purpose,
       company,
       contact,
-      hostId,
+      hostId: req.user.id,
       visitDate,
+      email,
+      firstName,
+      lastName,
     },
     req.user.id,
     req.files

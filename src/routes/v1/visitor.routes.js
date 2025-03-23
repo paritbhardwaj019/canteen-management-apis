@@ -23,7 +23,7 @@ router.get(
   visitorController.findVisitors
 );
 
-router.post("/request", visitorController.registerVisitorRequest);
+router.post("/request/add", visitorController.registerVisitorRequest);
 
 router.put(
   "/process/:ticketId",
