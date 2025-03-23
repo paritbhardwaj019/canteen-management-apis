@@ -48,19 +48,71 @@ const initializeDatabase = async () => {
         name: "view_reports",
         description: "View system reports",
       },
+      {
+        name: "manage_visitors",
+        description: "Create, update and delete visitor information",
+      },
+      {
+        name: "approve_visitors",
+        description: "Approve or reject visitor requests",
+      },
+      {
+        name: "view_visitors",
+        description: "View visitor requests and information",
+      },
+      {
+        name: "register_visitor",
+        description: "Register new visitor requests",
+      },
+      {
+        name: "process_visitor",
+        description: "Process visitor requests status changes",
+      },
+      {
+        name: "handle_visitor_entry",
+        description: "Handle physical entry of visitors to premises",
+      },
+      {
+        name: "view_visitor_records",
+        description: "Access and view historical visitor records",
+      },
+      {
+        name: "view_visitor_status",
+        description: "Check status of visitor tickets",
+      },
     ];
 
+    // Define all roles that should exist in the system
+    const allDefinedRoles = [
+      {
+        name: "Super Admin",
+        description: "Full system access",
+      },
+      {
+        name: "Manager",
+        description: "Can manage and approve meal requests",
+      },
+      {
+        name: "Approver",
+        description: "Can approve meal requests",
+      },
+      {
+        name: "Employee",
+        description: "Regular employee",
+      },
+      {
+        name: "Visitor",
+        description: "Visitor access",
+      },
+    ];
+
+    // Check and create missing permissions
     const existingPermissions = await prisma.permission.findMany();
     const existingPermissionNames = existingPermissions.map((p) => p.name);
 
     const permissionsToCreate = allDefinedPermissions.filter(
       (p) => !existingPermissionNames.includes(p.name)
     );
-
-    let superAdminRole = await prisma.role.findUnique({
-      where: { name: "Super Admin" },
-      include: { permissions: true },
-    });
 
     let newlyCreatedPermissions = [];
     if (permissionsToCreate.length > 0) {
@@ -77,15 +129,75 @@ const initializeDatabase = async () => {
       console.log("New permissions created successfully");
     }
 
-    // Sync permissions with Super Admin role if it exists
-    if (superAdminRole) {
-      // Get all permission IDs that the Super Admin should have
-      const allPermissions = [
-        ...existingPermissions,
-        ...newlyCreatedPermissions,
-      ];
+    // Get all available permissions after creation
+    const allPermissions = [...existingPermissions, ...newlyCreatedPermissions];
 
-      // Calculate which permissions need to be added to the Super Admin role
+    // Check for existing roles
+    const existingRoles = await prisma.role.findMany();
+    const existingRoleNames = existingRoles.map((r) => r.name);
+
+    // Filter roles that need to be created
+    const rolesToCreate = allDefinedRoles.filter(
+      (r) => !existingRoleNames.includes(r.name)
+    );
+
+    if (rolesToCreate.length > 0) {
+      console.log(`Creating ${rolesToCreate.length} missing roles...`);
+
+      // Role permission mappings
+      const rolePermissionMap = {
+        "Super Admin": allPermissions.map((p) => ({ id: p.id })),
+        Manager: allPermissions
+          .filter((p) =>
+            [
+              "manage_requests",
+              "approve_meal_requests",
+              "view_all_requests",
+              "view_reports",
+              "manage_devices",
+              "view_logs",
+            ].includes(p.name)
+          )
+          .map((p) => ({ id: p.id })),
+        Approver: allPermissions
+          .filter((p) =>
+            [
+              "approve_meal_requests",
+              "view_all_requests",
+              "view_reports",
+            ].includes(p.name)
+          )
+          .map((p) => ({ id: p.id })),
+        Employee: [],
+        Visitor: [],
+      };
+
+      // Create each missing role with appropriate permissions
+      await Promise.all(
+        rolesToCreate.map(async (role) => {
+          const permissions = rolePermissionMap[role.name] || [];
+          return await prisma.role.create({
+            data: {
+              name: role.name,
+              description: role.description,
+              permissions: {
+                connect: permissions,
+              },
+            },
+          });
+        })
+      );
+
+      console.log("Missing roles created successfully");
+    }
+
+    // Update Super Admin role with any new permissions
+    let superAdminRole = await prisma.role.findUnique({
+      where: { name: "Super Admin" },
+      include: { permissions: true },
+    });
+
+    if (superAdminRole) {
       const superAdminPermissionIds = superAdminRole.permissions.map(
         (p) => p.id
       );
@@ -93,7 +205,6 @@ const initializeDatabase = async () => {
         (p) => !superAdminPermissionIds.includes(p.id)
       );
 
-      // Add missing permissions to Super Admin
       if (permissionsToAdd.length > 0) {
         console.log(
           `Adding ${permissionsToAdd.length} permissions to Super Admin role...`
@@ -110,74 +221,9 @@ const initializeDatabase = async () => {
 
         console.log("Super Admin role updated with all permissions");
       }
-    } else {
-      console.log("Creating default roles and permissions...");
-
-      const allPermissions = await prisma.permission.findMany();
-
-      const roles = [
-        {
-          name: "Super Admin",
-          description: "Full system access",
-          permissions: {
-            connect: allPermissions.map((p) => ({ id: p.id })),
-          },
-        },
-        {
-          name: "Manager",
-          description: "Can manage and approve meal requests",
-          permissions: {
-            connect: allPermissions
-              .filter((p) =>
-                [
-                  "manage_requests",
-                  "approve_meal_requests",
-                  "view_all_requests",
-                  "view_reports",
-                  "manage_devices",
-                  "view_logs",
-                ].includes(p.name)
-              )
-              .map((p) => ({ id: p.id })),
-          },
-        },
-        {
-          name: "Approver",
-          description: "Can approve meal requests",
-          permissions: {
-            connect: allPermissions
-              .filter((p) =>
-                [
-                  "approve_meal_requests",
-                  "view_all_requests",
-                  "view_reports",
-                ].includes(p.name)
-              )
-              .map((p) => ({ id: p.id })),
-          },
-        },
-        {
-          name: "Employee",
-          description: "Regular employee",
-          permissions: { connect: [] },
-        },
-      ];
-
-      await Promise.all(
-        roles.map(async (role) => {
-          return await prisma.role.create({
-            data: role,
-          });
-        })
-      );
-
-      console.log("Default roles and permissions created successfully");
-
-      superAdminRole = await prisma.role.findUnique({
-        where: { name: "Super Admin" },
-      });
     }
 
+    // Create super admin user if doesn't exist
     const superAdminUser = await prisma.user.findFirst({
       where: {
         role: {

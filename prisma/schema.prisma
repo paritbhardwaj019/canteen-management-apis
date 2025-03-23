@@ -21,21 +21,26 @@ model RefreshToken {
 }
 
 model User {
-  id              String        @id @default(uuid())
-  email           String        @unique
+  id              String          @id @default(uuid())
+  email           String          @unique
   password        String
   firstName       String
   lastName        String
-  role            Role          @relation(fields: [roleId], references: [id])
+  role            Role            @relation(fields: [roleId], references: [id])
   roleId          String
   department      String?
-  isActive        Boolean       @default(true)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  mealRequests    MealRequest[] @relation("EmployeeRequests")
-  approvedRequests MealRequest[] @relation("ApproverRequests")
-  rejectedRequests MealRequest[] @relation("RejectorRequests")
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  mealRequests    MealRequest[]   @relation("EmployeeRequests")
+  approvedRequests MealRequest[]  @relation("ApproverRequests")
+  rejectedRequests MealRequest[]  @relation("RejectorRequests")
   refreshTokens   RefreshToken[]
+  visitorProfile  VisitorProfile?
+  visitorRequests VisitorRequest[] @relation("VisitorRequestUser")
+  hostedVisitors  VisitorRequest[] @relation("VisitorRequestHost")
+  createdVisitors VisitorRequest[] @relation("VisitorRequestCreatedBy")
+  approvedVisitors VisitorRequest[] @relation("VisitorRequestApprovedBy")
 
   @@map("users")
 }
@@ -114,6 +119,64 @@ model MealRequest {
   updatedAt       DateTime      @updatedAt
 
   @@map("meal_requests")
+}
+
+model VisitorProfile {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contactNumber String?
+  company       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("visitor_profiles")
+}
+
+model VisitorRequest {
+  id            String         @id @default(uuid())
+  userId        String
+  user          User           @relation("VisitorRequestUser", fields: [userId], references: [id])
+  hostId        String
+  host          User           @relation("VisitorRequestHost", fields: [hostId], references: [id])
+  purpose       String?
+  company       String?
+  contactNumber String?
+  visitDate     DateTime
+  ticketId      String         @unique
+  status        VisitorStatus  @default(PENDING)
+  remarks       String?
+  
+  createdById   String
+  createdBy     User           @relation("VisitorRequestCreatedBy", fields: [createdById], references: [id])
+  approvedById  String?
+  approvedBy    User?          @relation("VisitorRequestApprovedBy", fields: [approvedById], references: [id])
+  approvedAt    DateTime?
+  
+  entries       VisitorEntry[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@map("visitor_requests")
+}
+
+model VisitorEntry {
+  id               String        @id @default(uuid())
+  visitorRequestId String
+  visitorRequest   VisitorRequest @relation(fields: [visitorRequestId], references: [id])
+  entryDate        DateTime
+  entryTime        DateTime
+  exitTime         DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@map("visitor_entries")
+}
+
+enum VisitorStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum MealType {

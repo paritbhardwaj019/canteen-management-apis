@@ -14,6 +14,8 @@ const mealRoutes = require("./routes/v1/meal.routes");
 const esslRoutes = require("./routes/v1/essl.routes");
 const mealRequestRoutes = require("./routes/v1/mealRequest.routes");
 const permissionRoutes = require("./routes/v1/permission.routes");
+const visitorRoutes = require("./routes/v1/visitor.routes");
+const visitorAuthRoutes = require("./routes/v1/visitorAuth.routes");
 
 const app = express();
 
@@ -44,6 +46,8 @@ app.use(`${apiPrefix}/meals`, mealRoutes);
 app.use(`${apiPrefix}/essl`, esslRoutes);
 app.use(`${apiPrefix}/requests`, mealRequestRoutes);
 app.use(`${apiPrefix}/permissions`, permissionRoutes);
+app.use(`${apiPrefix}/visitors`, visitorRoutes);
+app.use(`${apiPrefix}/visitor-auth`, visitorAuthRoutes);
 
 app.get(`${apiPrefix}/health`, (req, res) => {
   res.status(200).json({
