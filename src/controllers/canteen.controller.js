@@ -11,7 +11,7 @@ const getAllTodaysEntries = asyncHandler(async (req, res) => {
     throw badRequest("Invalid date format. Use YYYY-MM-DD (e.g., 2025-03-24)");
   }
 
-  const entries = await canteenService.getAllEntries(req.user, {
+  const result = await canteenService.getAllEntries(req.user, {
     date: date || today,
     location: location || "Chennai",
   });
@@ -19,7 +19,7 @@ const getAllTodaysEntries = asyncHandler(async (req, res) => {
   return ApiResponse.ok(
     res,
     `${date ? "Entries" : "Today's entries"} retrieved successfully`,
-    entries
+    result
   );
 });
 

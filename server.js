@@ -197,7 +197,17 @@ const initializeDatabase = async () => {
         .map((p) => ({ id: p.id })),
       Employee: allPermissions
         .filter((p) =>
-          ["register_visitor", "view_visitor_status", ""].includes(p.name)
+          [
+            "register_visitor",
+            "view_visitor_status",
+            "view_plants",
+            "view_all_requests",
+            "view_reports",
+            "view_logs",
+            "view_visitors",
+            "view_visitor_records",
+            "process_visitor",
+          ].includes(p.name)
         )
         .map((p) => ({ id: p.id })),
       Visitor: [],

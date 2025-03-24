@@ -21,10 +21,65 @@ const parseLogTime = (logTime) => {
 };
 
 /**
+ * Generate table columns based on user role
+ * @param {string} role - User role
+ * @returns {Array} Array of column definitions
+ */
+const getCanteenEntryColumns = (role) => {
+  const baseColumns = [
+    { field: "photoUrl", headerName: "Photo", width: 100, renderCell: true },
+    { field: "employeeNo", headerName: "Employee No", width: 150 },
+    { field: "employeeName", headerName: "Employee Name", width: 180 },
+    { field: "email", headerName: "Email", width: 220 },
+    { field: "logTime", headerName: "Entry Time", width: 180 },
+    { field: "location", headerName: "Location", width: 150 },
+    { field: "status", headerName: "Status", width: 120 },
+  ];
+
+  if (role !== "EMPLOYEE") {
+    baseColumns.push({
+      field: "actions",
+      headerName: "Actions",
+      width: 150,
+    });
+  }
+
+  return baseColumns;
+};
+
+/**
+ * Format entry data to include employee info at the same level
+ * @param {Object} entry - Canteen entry with nested employee data
+ * @returns {Object} Flattened entry data
+ */
+const formatEntryData = (entry) => {
+  const { employee, ...entryData } = entry;
+
+  console.log("EMPLOYEE PHOTOS", employee?.photos);
+
+  const photoUrl =
+    employee?.photos && employee.photos.length > 0
+      ? employee.photos[0].url
+      : null;
+
+  return {
+    ...entryData,
+    employeeNo: employee?.employeeNo || "N/A",
+    employeeName: employee?.user
+      ? `${employee.user.firstName} ${employee.user.lastName}`
+      : "N/A",
+    email: employee?.user?.email || "N/A",
+    photoUrl: photoUrl,
+    logTime: entry.logTime ? new Date(entry.logTime).toLocaleString() : "N/A",
+    employee,
+  };
+};
+
+/**
  * Get all canteen entries with optional filters
  * @param {Object} loggedInUser - Current logged in user
  * @param {Object} filters - Optional filters { date, location }
- * @returns {Promise<Array>} List of canteen entries
+ * @returns {Promise<Object>} Object containing entries and column definitions
  */
 const getAllEntries = async (loggedInUser, filters = {}) => {
   const { role, plantId } = loggedInUser;
@@ -35,14 +90,19 @@ const getAllEntries = async (loggedInUser, filters = {}) => {
   }
 
   try {
+    let entries = [];
+
     if (date && location) {
       const logs = await getDeviceLogs(date, location);
 
       if (!logs || logs.length === 0) {
-        return [];
+        return {
+          entries: [],
+          columns: getCanteenEntryColumns(role),
+        };
       }
 
-      const entries = await Promise.all(
+      const processedEntries = await Promise.all(
         logs.map(async (log) => {
           const employee = await prisma.employee.findFirst({
             where: { employeeNo: log.user },
@@ -61,12 +121,11 @@ const getAllEntries = async (loggedInUser, filters = {}) => {
           const entry = await prisma.canteenEntry.upsert({
             where: {
               employeeId_logTime: {
-                // Use the exact name of the @@unique constraint
                 employeeId: employee.id,
                 logTime: parsedLogTime,
               },
             },
-            update: {}, // No updates needed since we're just ensuring the entry exists
+            update: {},
             create: {
               employeeId: employee.id,
               status: "PENDING",
@@ -80,6 +139,7 @@ const getAllEntries = async (loggedInUser, filters = {}) => {
               employee: {
                 select: {
                   employeeNo: true,
+                  photos: true,
                   user: {
                     select: {
                       firstName: true,
@@ -95,31 +155,38 @@ const getAllEntries = async (loggedInUser, filters = {}) => {
         })
       );
 
-      return entries.filter((entry) => entry !== null);
-    }
+      entries = processedEntries.filter((entry) => entry !== null);
+    } else {
+      const whereClause = plantId ? { employee: { plantId } } : {};
 
-    const whereClause = plantId ? { employee: { plantId } } : {};
-
-    const entries = await prisma.canteenEntry.findMany({
-      where: whereClause,
-      include: {
-        employee: {
-          select: {
-            employeeNo: true,
-            user: {
-              select: {
-                firstName: true,
-                lastName: true,
-                email: true,
+      entries = await prisma.canteenEntry.findMany({
+        where: whereClause,
+        include: {
+          employee: {
+            select: {
+              employeeNo: true,
+              photos: true,
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: { logTime: "desc" },
-    });
+        orderBy: { logTime: "desc" },
+      });
+    }
 
-    return entries;
+    // Format the entries to include employee data at the same level
+    const formattedEntries = entries.map(formatEntryData);
+
+    return {
+      entries: formattedEntries,
+      columns: getCanteenEntryColumns(role),
+    };
   } catch (error) {
     console.error("Error fetching canteen entries:", error);
     throw badRequest(`Failed to fetch entries: ${error.message}`);
@@ -148,13 +215,15 @@ const approveEntry = async (id, status) => {
               select: {
                 firstName: true,
                 lastName: true,
+                email: true,
               },
             },
           },
         },
       },
     });
-    return entry;
+
+    return formatEntryData(entry);
   } catch (error) {
     console.error("Error approving entry:", error);
     throw badRequest(`Failed to approve entry: ${error.message}`);
