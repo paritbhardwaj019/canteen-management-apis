@@ -156,14 +156,15 @@ const getAllEntries = async (loggedInUser, filters = {}) => {
           return entry;
         })
       );
-
-      entries = processedEntries.filter((entry) => entry !== null);
+      console.log("PROCESSED ENTRIES");
+      entries = processedEntries.filter((entry) => entry !== null && entry.status === 'PENDING');
     } else {
-      const whereClause = plantId ? { employee: { plantId } } : {};
-
+      const whereClause = plantId ? { employee: { plantId } , status: 'PENDING'} : { status: 'PENDING'};
+      console.log("WHERE CLAUSE", whereClause);
       entries = await prisma.canteenEntry.findMany({
         where: whereClause,
         include: {
+         
           employee: {
             select: {
               employeeNo: true,
@@ -243,9 +244,9 @@ const getCanteenReport = async (loggedInUser, filters = {}) => {
 
   const dateFilter = toDate
     ? { gte: new Date(fromDate), lte: new Date(toDate) }
-    : { gte: new Date(fromDate) };
+    : { gte: new Date(fromDate), lt: new Date(new Date(fromDate).setDate(new Date(fromDate).getDate() + 1)) };
 
-  const entries = await prisma.canteenEntry.findMany({
+  let entries = await prisma.canteenEntry.findMany({
     where: {
       logTime: dateFilter,
       status: "APPROVED",
@@ -267,14 +268,31 @@ const getCanteenReport = async (loggedInUser, filters = {}) => {
               lastName: true,
               email: true,
             },
-            
           },
         },
       },
     },
   });
 
+  const meals = await prisma.menu.findMany({
+  });
 
+  
+  entries = entries.map((entry) => ({
+    ...entry,
+    plantName: entry.plant?.name || "N/A",
+    plantCode: entry.plant?.plantCode || "N/A",
+    date: entry.logTime.toISOString().split("T")[0],
+    employeeNo: entry.employee.employeeNo,
+    employeeName: entry.employee.user.firstName + " " + entry.employee.user.lastName,
+    logTime: entry.logTime.toISOString().split("T")[0],
+    quantity: 1,
+    employerContribution: meals[0].emrContribution,
+    employeeContribution: meals[0].empContribution,
+    price: meals[0].price,
+    meal: meals[0].name,
+    mealType: meals[0].type
+  }));
 
   return {entries, columns: getCanteenReportColumns()};
 };

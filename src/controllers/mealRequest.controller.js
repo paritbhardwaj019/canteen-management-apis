@@ -145,7 +145,7 @@ const getMealRequestSummary = asyncHandler(async (req, res) => {
   const summary = await mealRequestService.getMealRequestSummary({
     from,
     to,
-  });
+  }, req.user);
 
   return ApiResponse.ok(
     res,
