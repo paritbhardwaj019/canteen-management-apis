@@ -270,6 +270,8 @@ const login = async (credentials) => {
     throw unauthorized("Invalid credentials");
   }
 
+  // Generate tokens
+  console.log("user", user);
   const accessToken = generateAccessToken({
     userId: user.id,
     email: user.email,

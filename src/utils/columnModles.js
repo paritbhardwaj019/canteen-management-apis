@@ -76,8 +76,23 @@ const getMealRequestColumns = (userRole) => {
   return baseColumns;
 };
 
+const getCanteenReportColumns = () => {
+  return [
+    { field: "plantName", headerName: "Plant Name", width: 150 },
+    { field: "plantCode", headerName: "Plant Code", width: 150 },
+    { field: "date", headerName: "Date", width: 150 },
+    { field: "employeeNo", headerName: "Employee No", width: 150 },
+    { field: "name", headerName: "Employee Name", width: 150 },
+    { field: "quantity", headerName: "Quantity", width: 150 },
+    { field: "totalPrice", headerName: "Total Price", width: 150 }, 
+    { field: "employerContribution", headerName: "Employer Contribution", width: 150 },
+    { field: "employeeContribution", headerName: "Employee Contribution", width: 150 },
+   
+  ];
+};
 module.exports = {
   getUserColumns,
   getMenuColumns,
   getMealRequestColumns,
+  getCanteenReportColumns,
 };
