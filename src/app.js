@@ -19,6 +19,9 @@ const visitorAuthRoutes = require("./routes/v1/visitorAuth.routes");
 const canteenRoutes = require("./routes/v1/canteen.routes");
 const plantRoutes = require("./routes/v1/plant.routes");
 const employeeRoutes = require("./routes/v1/employee.routes");
+const { setupCronJobs } = require("./services/cron.service");
+
+setupCronJobs();
 
 const app = express();
 

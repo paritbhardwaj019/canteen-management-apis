@@ -3,17 +3,14 @@ const router = express.Router();
 const canteenController = require("../../controllers/canteen.controller");
 const { authenticate } = require("../../middlewares/auth.middleware");
 
-router.use(authenticate);
-
 router.get(
-  "/entries",
-  // checkPermissions(["manage_devices"]),
+  "/entries/today",
+  authenticate,
   canteenController.getAllTodaysEntries
 );
-
-router.post(
-  "/approveEntry",
-  // checkPermissions(["manage_devices", "view_logs"]),
+router.put(
+  "/entries/:id/approve",
+  authenticate,
   canteenController.approveEntry
 );
 
