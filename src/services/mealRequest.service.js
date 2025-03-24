@@ -1,6 +1,7 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 const { getMealRequestColumns } = require("../utils/columnModles");
+const { getAllEntries } = require("./canteen.service");
 const {
   notFound,
   badRequest,
@@ -397,7 +398,7 @@ const deleteMealRequest = async (id, userId, permissions) => {
   return true;
 };
 
-const getMealRequestSummary = async (filters) => {
+const getMealRequestSummary = async (filters, user) => {
   console.log(filters);
   const { from, to } = filters;
 
@@ -459,7 +460,24 @@ const getMealRequestSummary = async (filters) => {
   });
 
 
+  const today = new Date().toISOString().split("T")[0];
+
+  const tabledata =  await getAllMealRequests(
+    {
+      status: 'APPROVED',
+      userId: user.id,
+      date: today,
+      from: today,
+      to: today
+    },
+    user.id,
+    user.permissions,
+    user.role
+  );
+
   return {
+    data: tabledata.transformedData,
+    columns: getMealRequestColumns('Employee'),
     heading: {
       totalEmployees,
       totalRequests: mealRequests.length,
