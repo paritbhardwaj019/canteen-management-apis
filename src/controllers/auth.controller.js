@@ -3,33 +3,12 @@ const asyncHandler = require("../utils/async.handler");
 const { badRequest } = require("../utils/api.error");
 const ApiResponse = require("../utils/api.response");
 
-const registerEmployee = asyncHandler(async (req, res) => {
-  const { email, password, name, roleId, startDate, endDate, empCode } =
-    req.body;
-
-  const result = await authService.registerEmployee({
-    email,
-    password,
-    name,
-    roleId,
-    startDate,
-    endDate,
-    empCode,
-  });
-
-  return ApiResponse.created(res, "Employee registered successfully", {
-    employee: result.employee,
-    roleName: result.roleName,
-    accessToken: result.accessToken,
-    refreshToken: result.refreshToken,
-  });
-});
-
 /**
  * Register a new user
  */
 const register = asyncHandler(async (req, res) => {
-  const { email, password, firstName, lastName, roleId, department } = req.body;
+  const { email, code, password, firstName, lastName, roleId, department } =
+    req.body;
 
   if (!email || !password || !firstName || !lastName || !roleId) {
     throw badRequest("Missing required fields");
@@ -37,6 +16,7 @@ const register = asyncHandler(async (req, res) => {
 
   const result = await authService.register({
     email,
+    code,
     password,
     firstName,
     lastName,
@@ -48,12 +28,47 @@ const register = asyncHandler(async (req, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 
   return ApiResponse.created(res, "User registered successfully", {
     user: result.user,
-    roleName: result.roleName,
+    accessToken: result.accessToken,
+    refreshToken: result.refreshToken,
+    refreshTokenExpiry: result.refreshTokenExpiry,
+  });
+});
+
+/**
+ * Register a new employee
+ */
+const registerEmployee = asyncHandler(async (req, res) => {
+  const { email, password, firstName, lastName, employeeNo, department } =
+    req.body;
+
+  // Validate required fields
+  if (!employeeNo || !password || !firstName || !lastName) {
+    throw badRequest("Missing required fields");
+  }
+
+  const result = await authService.registerEmployee({
+    email,
+    password,
+    firstName,
+    lastName,
+    employeeNo,
+    department,
+  });
+
+  res.cookie("refreshToken", result.refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+
+  return ApiResponse.created(res, "Employee registered successfully", {
+    user: result.user,
     accessToken: result.accessToken,
     refreshToken: result.refreshToken,
     refreshTokenExpiry: result.refreshTokenExpiry,
@@ -64,24 +79,48 @@ const register = asyncHandler(async (req, res) => {
  * Login a user
  */
 const login = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const { email, code, password, loginType } = req.body;
 
-  if (!email || !password) {
-    throw badRequest("Email and password are required");
+  let determinedLoginType = loginType;
+  if (!determinedLoginType) {
+    if (email) {
+      determinedLoginType = "EMAIL";
+    } else if (code) {
+      determinedLoginType = "CODE";
+    } else {
+      throw badRequest("Either email or code is required for login");
+    }
   }
 
-  const result = await authService.login({ email, password });
+  if (determinedLoginType === "EMAIL" && !email) {
+    throw badRequest("Email is required for email login");
+  }
 
+  if (determinedLoginType === "CODE" && !code) {
+    throw badRequest("Code is required for code login");
+  }
+
+  if (!password) {
+    throw badRequest("Password is required");
+  }
+
+  const result = await authService.login({
+    email,
+    code,
+    password,
+    loginType: determinedLoginType,
+  });
+
+  // Set HTTP-only cookie with refresh token
   res.cookie("refreshToken", result.refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 
   return ApiResponse.ok(res, "Login successful", {
     user: result.user,
-    roleName: result.roleName,
     accessToken: result.accessToken,
     refreshToken: result.refreshToken,
     refreshTokenExpiry: result.refreshTokenExpiry,
@@ -118,12 +157,10 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
  * Logout a user
  */
 const logout = asyncHandler(async (req, res) => {
-  // Get refresh token from cookie or request body
   const refreshToken = req.cookies.refreshToken || req.body.refreshToken;
 
   await authService.logout(refreshToken);
 
-  // Clear refresh token cookie
   res.clearCookie("refreshToken");
 
   return ApiResponse.ok(res, "Logout successful");
@@ -153,10 +190,10 @@ const getProfile = asyncHandler(async (req, res) => {
 
 module.exports = {
   register,
+  registerEmployee,
   login,
   refreshAccessToken,
   logout,
   logoutAll,
   getProfile,
-  registerEmployee,
 };

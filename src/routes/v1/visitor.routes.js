@@ -39,7 +39,7 @@ router.get(
 
 router.post(
   "/entry/:ticketId",
-  checkPermissions(["manage_visitors"]),
+  checkPermissions(["manage_visitors", "manage_roles"]),
   visitorController.handleVisitorEntry
 );
 

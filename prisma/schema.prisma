@@ -23,6 +23,7 @@ model RefreshToken {
 model User {
   id               String           @id @default(uuid())
   email            String           @unique
+  code             String?          @unique
   password         String
   firstName        String
   lastName         String

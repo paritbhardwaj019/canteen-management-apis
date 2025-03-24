@@ -16,65 +16,32 @@ const {
 } = require("../utils/api.error");
 
 /**
- * Format role name to uppercase with underscores
- * @param {String} roleName - Original role name
- * @returns {String} Formatted role name
+ * Generate a unique user code
+ * @param {String} prefix - Code prefix (default: 'US')
+ * @returns {Promise<String>} Generated unique code
  */
-const formatRoleName = (roleName) => {
-  if (!roleName) return "";
-  return roleName.toUpperCase().replace(/\s+/g, "_");
-};
+const generateUniqueUserCode = async (prefix = "US") => {
+  const userCount = await prisma.user.count();
 
-const registerEmployee = async (userData) => {
-  const { email, password, name, roleId, startDate, endDate, empCode } =
-    userData;
-  const existingEmployee = await prisma.employee.findUnique({
-    where: { email: email, empCode: empCode },
-  });
-  if (existingEmployee) {
-    throw new ApiError(409, "Employee with this email already exists");
+  let sequentialNumber = 1000 + userCount;
+  let isUnique = false;
+  let code;
+
+  while (!isUnique) {
+    code = `${prefix}${sequentialNumber.toString().slice(-2)}`;
+
+    const existingUser = await prisma.user.findUnique({
+      where: { code },
+    });
+
+    if (!existingUser) {
+      isUnique = true;
+    } else {
+      sequentialNumber++;
+    }
   }
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const newEmployee = await prisma.employee.create({
-    data: {
-      email,
-      password: hashedPassword,
-      name,
-      empCode,
-      startDate,
-      endDate,
-      roleId: "cac87de3-96f9-4486-892f-27299fd6fa5b",
-    },
-    include: {
-      role: true,
-    },
-  });
 
-  // Generate tokens
-  const accessToken = generateAccessToken({
-    userId: newEmployee.id,
-    email: newEmployee.email,
-    role: newEmployee.role.name,
-  });
-
-  const refreshTokenObj = await generateRefreshToken(newEmployee.id);
-
-  // Return user data without password
-  const { password: _, ...employeeWithoutPassword } = newEmployee;
-
-  // Format role name for response
-  const formattedRoleName = formatRoleName(newEmployee.role.name);
-
-  return {
-    employee: {
-      ...employeeWithoutPassword,
-      roleName: formattedRoleName,
-    },
-    roleName: formattedRoleName,
-    accessToken,
-    refreshToken: refreshTokenObj.token, // Return just the token string
-    refreshTokenExpiry: refreshTokenObj.expiresAt, // Optionally include expiry
-  };
+  return code;
 };
 
 /**
@@ -83,22 +50,47 @@ const registerEmployee = async (userData) => {
  * @returns {Object} Newly created user, access token and refresh token
  */
 const register = async (userData) => {
-  const { email, password, firstName, lastName, roleId, department, type } =
-    userData;
+  const {
+    email,
+    code: providedCode,
+    password,
+    firstName,
+    lastName,
+    roleId,
+    department,
+  } = userData;
 
-  const existingUser = await prisma.user.findUnique({
+  const existingUserByEmail = await prisma.user.findUnique({
     where: { email },
   });
 
-  if (existingUser) {
+  if (existingUserByEmail) {
     throw new ApiError(409, "User with this email already exists");
   }
 
+  // Use provided code or generate a new one
+  let userCode = providedCode;
+  if (!userCode) {
+    userCode = await generateUniqueUserCode();
+  } else {
+    // Check if provided code already exists
+    const existingUserByCode = await prisma.user.findUnique({
+      where: { code: userCode },
+    });
+
+    if (existingUserByCode) {
+      throw new ApiError(409, "User with this code already exists");
+    }
+  }
+
+  // Hash password
   const hashedPassword = await bcrypt.hash(password, 10);
 
+  // Create new user
   const newUser = await prisma.user.create({
     data: {
       email,
+      code: userCode,
       password: hashedPassword,
       firstName,
       lastName,
@@ -113,6 +105,7 @@ const register = async (userData) => {
   const accessToken = generateAccessToken({
     userId: newUser.id,
     email: newUser.email,
+    code: newUser.code,
     role: newUser.role.name,
   });
 
@@ -120,14 +113,87 @@ const register = async (userData) => {
 
   const { password: _, ...userWithoutPassword } = newUser;
 
-  const formattedRoleName = formatRoleName(newUser.role.name);
+  return {
+    user: userWithoutPassword,
+    accessToken,
+    refreshToken: refreshTokenObj.token,
+    refreshTokenExpiry: refreshTokenObj.expiresAt,
+  };
+};
+
+/**
+ * Register a new employee
+ * @param {Object} employeeData - Employee registration data
+ * @returns {Object} Newly created employee, access token and refresh token
+ */
+const registerEmployee = async (employeeData) => {
+  const { email, password, firstName, lastName, employeeNo, department } =
+    employeeData;
+
+  const existingEmployee = await prisma.employee.findUnique({
+    where: { employeeNo },
+  });
+
+  if (existingEmployee) {
+    throw new ApiError(409, "Employee with this number already exists");
+  }
+
+  if (email) {
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      throw new ApiError(409, "User with this email already exists");
+    }
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  const employeeRole = await prisma.role.findFirst({
+    where: { name: "Employee" },
+  });
+
+  if (!employeeRole) {
+    throw new ApiError(404, "Employee role not found");
+  }
+
+  const newUser = await prisma.user.create({
+    data: {
+      email,
+      code: employeeNo,
+      password: hashedPassword,
+      firstName,
+      lastName,
+      roleId: employeeRole.id,
+      department,
+      employee: {
+        create: {
+          employeeNo,
+          department,
+        },
+      },
+    },
+    include: {
+      role: true,
+      employee: true,
+    },
+  });
+
+  const accessToken = generateAccessToken({
+    userId: newUser.id,
+    email: newUser.email,
+    code: newUser.code,
+    role: newUser.role.name,
+    employeeNo: newUser.employee?.employeeNo,
+  });
+
+  const refreshTokenObj = await generateRefreshToken(newUser.id);
+
+  const { password: _, ...userWithoutPassword } = newUser;
 
   return {
-    user: {
-      ...userWithoutPassword,
-      roleName: formattedRoleName,
-    },
-    roleName: formattedRoleName,
+    user: userWithoutPassword,
     accessToken,
     refreshToken: refreshTokenObj.token,
     refreshTokenExpiry: refreshTokenObj.expiresAt,
@@ -140,59 +206,90 @@ const register = async (userData) => {
  * @returns {Object} User data, access token and refresh token
  */
 const login = async (credentials) => {
-  const { email, password } = credentials;
+  const { email, code, password, loginType } = credentials;
+  let user = null;
 
-  // Find user by email
-  const user = await prisma.user.findUnique({
-    where: { email },
-    include: {
-      role: {
-        include: {
-          permissions: true,
+  if (loginType === "EMAIL" && email) {
+    user = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        role: {
+          include: {
+            permissions: true,
+          },
         },
+        employee: true,
       },
-    },
-  });
+    });
+  } else if (loginType === "CODE" && code) {
+    user = await prisma.user.findUnique({
+      where: { code },
+      include: {
+        role: {
+          include: {
+            permissions: true,
+          },
+        },
+        employee: true,
+      },
+    });
+
+    if (!user) {
+      const employee = await prisma.employee.findUnique({
+        where: { employeeNo: code },
+        include: {
+          user: {
+            include: {
+              role: {
+                include: {
+                  permissions: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (employee && employee.user) {
+        user = employee.user;
+        user.employee = employee;
+      }
+    }
+  }
 
   if (!user) {
-    throw unauthorized("Invalid email or password");
+    throw unauthorized("Invalid credentials");
   }
 
   if (!user.isActive) {
     throw forbidden("User account is deactivated");
   }
 
-  // Check password
   const isPasswordValid = await bcrypt.compare(password, user.password);
   if (!isPasswordValid) {
-    throw unauthorized("Invalid email or password");
+    throw unauthorized("Invalid credentials");
   }
 
-  // Generate tokens
   const accessToken = generateAccessToken({
     userId: user.id,
     email: user.email,
+    code: user.code,
     role: user.role.name,
+    employeeNo: user.employee?.employeeNo,
   });
 
   const refreshTokenObj = await generateRefreshToken(user.id);
 
-  // Return user data without password
   const { password: _, ...userWithoutPassword } = user;
-
-  // Format role name for response
-  const formattedRoleName = formatRoleName(user.role.name);
 
   return {
     user: {
       ...userWithoutPassword,
       permissions: user.role.permissions.map((p) => p.name),
-      roleName: formattedRoleName,
     },
-    roleName: formattedRoleName,
     accessToken,
-    refreshToken: refreshTokenObj.token, // Return just the token string
-    refreshTokenExpiry: refreshTokenObj.expiresAt, // Optionally include expiry
+    refreshToken: refreshTokenObj.token,
+    refreshTokenExpiry: refreshTokenObj.expiresAt,
   };
 };
 
@@ -202,21 +299,28 @@ const login = async (credentials) => {
  * @returns {Object} New access token and refresh token
  */
 const refreshToken = async (token) => {
-  // Find and validate refresh token
   const refreshTokenData = await findRefreshToken(token);
   const { user } = refreshTokenData;
 
-  // Revoke current refresh token
-  await revokeRefreshToken(token);
-
-  // Generate new tokens
-  const accessToken = generateAccessToken({
-    userId: user.id,
-    email: user.email,
-    role: user.role.name,
+  const userWithEmployee = await prisma.user.findUnique({
+    where: { id: user.id },
+    include: {
+      employee: true,
+      role: true,
+    },
   });
 
-  const newRefreshTokenObj = await generateRefreshToken(user.id);
+  await revokeRefreshToken(token);
+
+  const accessToken = generateAccessToken({
+    userId: userWithEmployee.id,
+    email: userWithEmployee.email,
+    code: userWithEmployee.code,
+    role: userWithEmployee.role.name,
+    employeeNo: userWithEmployee.employee?.employeeNo,
+  });
+
+  const newRefreshTokenObj = await generateRefreshToken(userWithEmployee.id);
 
   return {
     accessToken,
@@ -251,9 +355,9 @@ const logoutAll = async (userId) => {
 
 module.exports = {
   register,
+  registerEmployee,
   login,
   refreshToken,
   logout,
   logoutAll,
-  registerEmployee,
 };
