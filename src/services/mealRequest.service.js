@@ -430,7 +430,7 @@ const getMealRequestSummary = async (filters) => {
   const approvedRequests = await prisma.mealRequest.findMany({
     where: {
       ...dateFilter,
-      status: "COMPLETED",
+      status: { in: ["COMPLETED", "APPROVED"] },
     },
   });
 
