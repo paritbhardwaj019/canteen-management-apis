@@ -113,6 +113,7 @@ const createEmployee = async (
         roleId: employeeRole.id,
         department,
         isActive: true,
+        code: employeeNo,
       },
     });
 
