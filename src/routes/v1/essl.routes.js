@@ -18,4 +18,25 @@ router.get(
   esslController.getDeviceLogs
 );
 
+router.post(
+  "/locations",
+  esslController.addNewLocation
+);
+
+router.get(
+  "/locations",
+  esslController.getAllLocations
+);
+
+router.delete(
+  "/locations/:id",
+  esslController.deleteLocation
+);
+
+router.put(
+  "/locations/:id",
+  esslController.updateLocation
+);
+
+
 module.exports = router;

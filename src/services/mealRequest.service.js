@@ -480,7 +480,6 @@ const getMealRequestSummary = async (filters) => {
       acc[item.status.toLowerCase()] = item._count.status;
       return acc;
     }, {}),
-
   };
 };
 

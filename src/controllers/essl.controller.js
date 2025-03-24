@@ -35,7 +35,42 @@ const getDeviceLogs = asyncHandler(async (req, res) => {
   );
 });
 
+/**
+ * Add a new device in locations table
+ */
+const addNewLocation = asyncHandler(async (req, res) => {
+  const { deviceName, serialNumber, locationType } = req.body;  
+  const newLocation = await esslService.addNewLocation({ deviceName, serialNumber, locationType });
+  return ApiResponse.ok(res, "New location added successfully", newLocation);
+});
+
+/**
+ * Get all locations
+ */
+const getAllLocations = asyncHandler(async (req, res) => {
+  const locations = await esslService.getAllLocations();
+  return ApiResponse.collection(res, "Locations retrieved successfully", locations);
+});
+
+//delete location
+const deleteLocation = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const deletedLocation = await esslService.deleteLocation(id);
+  return ApiResponse.ok(res, "Location deleted successfully", deletedLocation);
+});
+
+//update location
+const updateLocation = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const updatedLocation = await esslService.updateLocation(id, req.body);
+  return ApiResponse.ok(res, "Location updated successfully", updatedLocation);
+});
+
 module.exports = {
   getAllDevices,
   getDeviceLogs,
+  addNewLocation,
+  getAllLocations,
+  deleteLocation,
+  updateLocation,
 };
