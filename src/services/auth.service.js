@@ -62,9 +62,15 @@ const registerEmployee = async (userData) => {
   // Return user data without password
   const { password: _, ...employeeWithoutPassword } = newEmployee;
 
+  // Format role name for response
+  const formattedRoleName = formatRoleName(newEmployee.role.name);
+
   return {
-    employee: employeeWithoutPassword,
-    roleName: formatRoleName(newEmployee.role.name),
+    employee: {
+      ...employeeWithoutPassword,
+      roleName: formattedRoleName,
+    },
+    roleName: formattedRoleName,
     accessToken,
     refreshToken: refreshTokenObj.token, // Return just the token string
     refreshTokenExpiry: refreshTokenObj.expiresAt, // Optionally include expiry
@@ -104,7 +110,6 @@ const register = async (userData) => {
     },
   });
 
-  // Generate tokens
   const accessToken = generateAccessToken({
     userId: newUser.id,
     email: newUser.email,
@@ -113,12 +118,16 @@ const register = async (userData) => {
 
   const refreshTokenObj = await generateRefreshToken(newUser.id);
 
-  // Return user data without password
   const { password: _, ...userWithoutPassword } = newUser;
 
+  const formattedRoleName = formatRoleName(newUser.role.name);
+
   return {
-    user: userWithoutPassword,
-    roleName: formatRoleName(newUser.role.name),
+    user: {
+      ...userWithoutPassword,
+      roleName: formattedRoleName,
+    },
+    roleName: formattedRoleName,
     accessToken,
     refreshToken: refreshTokenObj.token,
     refreshTokenExpiry: refreshTokenObj.expiresAt,
@@ -171,12 +180,16 @@ const login = async (credentials) => {
   // Return user data without password
   const { password: _, ...userWithoutPassword } = user;
 
+  // Format role name for response
+  const formattedRoleName = formatRoleName(user.role.name);
+
   return {
     user: {
       ...userWithoutPassword,
       permissions: user.role.permissions.map((p) => p.name),
+      roleName: formattedRoleName,
     },
-    roleName: formatRoleName(user.role.name),
+    roleName: formattedRoleName,
     accessToken,
     refreshToken: refreshTokenObj.token, // Return just the token string
     refreshTokenExpiry: refreshTokenObj.expiresAt, // Optionally include expiry
