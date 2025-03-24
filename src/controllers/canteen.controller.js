@@ -35,7 +35,13 @@ const approveEntry = asyncHandler(async (req, res) => {
   return ApiResponse.ok(res, "Entry status updated successfully", entry);
 });
 
+const getCanteenReport = asyncHandler(async (req, res) => {
+  const report = await canteenService.getCanteenReport(req.user, req.query);
+  return ApiResponse.ok(res, "Canteen report retrieved successfully", report);
+});
+
 module.exports = {
   getAllTodaysEntries,
   approveEntry,
+  getCanteenReport,
 };

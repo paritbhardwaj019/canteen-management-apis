@@ -121,7 +121,7 @@ model Plant {
   
   plantHead    User?    @relation("PlantHeadRelation", fields: [plantHeadId], references: [id])
   users        User[]   @relation("UserPlantRelation")
-  
+  canteenEntries CanteenEntry[] @relation("PlantCanteenEntries")
   createdById  String?
   createdBy    User?    @relation("PlantCreatedBy", fields: [createdById], references: [id])
   updatedById  String?
@@ -239,10 +239,11 @@ model CanteenEntry {
   approveTime DateTime?
   logTime     DateTime
   location    String?
+  plantId     String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-
+  plant       Plant?   @relation("PlantCanteenEntries", fields: [plantId], references: [id]) 
   @@index([employeeId])
   @@unique([employeeId, logTime]) 
   @@map("canteen_entries")

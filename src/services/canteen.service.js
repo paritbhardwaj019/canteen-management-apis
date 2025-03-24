@@ -2,7 +2,7 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 const { getDeviceLogs } = require("../services/essl.service");
 const { badRequest } = require("../utils/api.error");
-
+const { getCanteenReportColumns } = require("../utils/columnModles");
 /**
  * Parse logTime string into a valid Date object
  * @param {string} logTime - Time string from ESSL (e.g., '2025-03-2311:34:52')
@@ -72,6 +72,7 @@ const formatEntryData = (entry) => {
     photoUrl: photoUrl,
     logTime: entry.logTime ? new Date(entry.logTime).toLocaleString() : "N/A",
     employee,
+    date: entry.logTime ? entry.logTime.toISOString().split("T")[0] : "N/A",
   };
 };
 
@@ -134,6 +135,7 @@ const getAllEntries = async (loggedInUser, filters = {}) => {
                 log.location?.toString() === "NaN"
                   ? null
                   : log.location?.toString(),
+              plantId: log.location?.toString(),
             },
             include: {
               employee: {
@@ -229,8 +231,56 @@ const approveEntry = async (id, status) => {
     throw badRequest(`Failed to approve entry: ${error.message}`);
   }
 };
+// get entries by date, custom date and only those with status APPROVED. and plant id from the users loggedin
+// fromDate and ToDate . if only from date is provided, then get all entries from that date only. and in case of both then range data.
+
+const getCanteenReport = async (loggedInUser, filters = {}) => {
+  const { fromDate, toDate } = filters;
+  const { plantId } = loggedInUser;
+  if (!fromDate) {
+    throw badRequest("From date is required");
+  }
+
+  const dateFilter = toDate
+    ? { gte: new Date(fromDate), lte: new Date(toDate) }
+    : { gte: new Date(fromDate) };
+
+  const entries = await prisma.canteenEntry.findMany({
+    where: {
+      logTime: dateFilter,
+      status: "APPROVED",
+    },
+    include: {
+      plant: {
+        select: {
+          name: true,
+          plantCode: true,
+        },
+      },
+
+      employee: {
+        select: {
+          employeeNo: true,
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+            
+          },
+        },
+      },
+    },
+  });
+
+
+
+  return {entries, columns: getCanteenReportColumns()};
+};
 
 module.exports = {
   getAllEntries,
   approveEntry,
+  getCanteenReport,
 };
