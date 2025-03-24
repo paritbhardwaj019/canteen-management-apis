@@ -11,17 +11,21 @@ const isValidDate = (dateString) => {
 };
 
 const createMealRequest = asyncHandler(async (req, res) => {
-  const { menuId } = req.body;
+  const { menuId, plantId } = req.body;
   const userId = req.user.id;
 
   if (!menuId) {
     throw badRequest("Menu ID is  required");
   }
 
+  if (!plantId) {
+    throw badRequest("Plant ID is required");
+  }
 
   const newRequest = await mealRequestService.createMealRequest(
     {
-      menuId
+      menuId, 
+      plantId
     },
     userId
   );
