@@ -22,9 +22,13 @@ const registerEmployee = asyncHandler(async (req, res) => {
     esslVerificationType,
   } = req.body;
 
+  console.log("FILE", req.file);
+
   if (!firstName || !lastName || !employeeNo) {
     throw badRequest("First name, last name, and employee number are required");
   }
+
+  const actualPassword = password || Math.random().toString(36).slice(-8);
 
   let photoUrl = null;
   let photoBase64 = null;
@@ -34,13 +38,15 @@ const registerEmployee = asyncHandler(async (req, res) => {
 
     if (registerInEssl) {
       try {
-        const fs = require("fs");
-        const fileBuffer = fs.readFileSync(req.file.path);
-        photoBase64 = `data:${req.file.mimetype};base64,${fileBuffer.toString(
-          "base64"
-        )}`;
+        const axios = require("axios");
+        const response = await axios.get(photoUrl, {
+          responseType: "arraybuffer",
+        });
+        const buffer = Buffer.from(response.data, "binary");
+        const mimeType = req.file.mimetype || "image/jpeg";
+        photoBase64 = `data:${mimeType};base64,${buffer.toString("base64")}`;
       } catch (error) {
-        console.error("Error converting file to base64:", error);
+        console.error("Error converting Cloudinary image to base64:", error);
       }
     }
   }
@@ -63,7 +69,7 @@ const registerEmployee = asyncHandler(async (req, res) => {
       department,
       designation,
       photoUrl,
-      password,
+      password: actualPassword,
     },
     registerInEssl,
     esslOptions
@@ -145,6 +151,7 @@ const getAllEmployees = asyncHandler(async (req, res) => {
     plantId,
     department,
     includePhotos: includePhotos === "true" || includePhotos === true,
+    userRole: req.user.role,
   });
 
   return ApiResponse.paginate(res, "Employees retrieved successfully", result);
