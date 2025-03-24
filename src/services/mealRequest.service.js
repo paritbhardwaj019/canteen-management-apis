@@ -16,8 +16,10 @@ const createMealRequest = async (requestData, userId) => {
     quantity = 1, 
     notes,
     employeeName,
-    employeeCode 
+    employeeCode , 
+    plantId
   } = requestData;
+  console.log("plant id is", plantId);
   
   // Validate menu
   const menu = await prisma.menu.findUnique({
@@ -45,6 +47,7 @@ const createMealRequest = async (requestData, userId) => {
   const requestDate = date ? new Date(date) : new Date();
   
   // Check for existing request
+  if(isEmployee){
   const existingRequest = await prisma.mealRequest.findFirst({
     where: {
       userId: userId,
@@ -63,8 +66,9 @@ const createMealRequest = async (requestData, userId) => {
     );
   }
 
+}
   // Auto-approve for employees
-  const initialStatus = isEmployee ? "APPROVED" : "PENDING";
+  const initialStatus = isEmployee ? "APPROVED" : "APPROVED";
   const approvalData = isEmployee
     ? {
         approvedBy: userId,
@@ -90,6 +94,7 @@ const createMealRequest = async (requestData, userId) => {
       menuId: menuId,
       date: requestDate,
       quantity,
+      plantId: plantId,
       notes,
       status: initialStatus,
       totalPrice: menu.price * quantity,
@@ -173,6 +178,18 @@ const getAllMealRequests = async (filters, userId, permissions, userRole) => {
     },
   });
 
+  const transformedData = data.map(request => {
+    return {
+      ...request,
+      menuName: request.menu.name,
+      menuEmpContribution: request.menu.empContribution,
+      menuEmrContribution: request.menu.emrContribution,
+      menuPrice: request.menu.price,
+      menuType: request.menu.type,
+      name: request.user.firstName + " " + request.user.lastName,
+    };
+  });
+
   let summary = data.reduce((acc, request) => {
     acc[request.status] = (acc[request.status] || 0) + 1;
     return acc;
@@ -185,7 +202,7 @@ const getAllMealRequests = async (filters, userId, permissions, userRole) => {
   console.log(summary);
   
   return {
-    data,
+    transformedData,
     summary,
     columns: getMealRequestColumns(userRole),
   };
@@ -430,7 +447,6 @@ const getMealRequestSummary = async (filters) => {
   const approvedRequests = await prisma.mealRequest.findMany({
     where: {
       ...dateFilter,
-      status: { in: ["COMPLETED", "APPROVED"] },
     },
   });
 
@@ -438,22 +454,38 @@ const getMealRequestSummary = async (filters) => {
     (sum, request) => sum + (request.totalPrice || 0),
     0
   );
+  
+  const totalEmployees = await prisma.employee.count({
+  });
+
 
   return {
+    heading: {
+      totalEmployees,
+      totalRequests: mealRequests.length,
+      totalLunchRequests: mealTypeCounts.lunch,
+
+      totalDinnerRequests: mealTypeCounts.dinner,
+    },
+    summary: {
+      totalEmployees,
+      totalRequests: mealRequests.length,
+      totalLunchRequests: mealTypeCounts.lunch,
+      totalDinnerRequests: mealTypeCounts.dinner,
+      totalRequests: mealRequests.length,
+      from: from || null,
+      to: to || null
+    },
     byStatus: statusCounts.reduce((acc, item) => {
       acc[item.status.toLowerCase()] = item._count.status;
       return acc;
     }, {}),
-    byMealType: mealTypeCounts,
-    totalApprovedAmount,
-    totalRequests: mealRequests.length,
-    dateRange: {
-      from: from || null,
-      to: to || null
-    }
+
   };
 };
 
+
+// 
 module.exports = {
   createMealRequest,
   getAllMealRequests,
