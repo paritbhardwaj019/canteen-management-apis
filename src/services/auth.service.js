@@ -15,6 +15,10 @@ const {
   forbidden,
 } = require("../utils/api.error");
 
+const formatRoleName = (roleName) => {
+  if (!roleName) return "";
+  return roleName.toUpperCase().replace(/\s+/g, "_");
+};
 /**
  * Generate a unique user code
  * @param {String} prefix - Code prefix (default: 'US')
@@ -216,6 +220,7 @@ const login = async (credentials) => {
         role: {
           include: {
             permissions: true,
+          
           },
         },
         employee: true,
@@ -228,6 +233,7 @@ const login = async (credentials) => {
         role: {
           include: {
             permissions: true,
+          
           },
         },
         employee: true,
@@ -243,6 +249,7 @@ const login = async (credentials) => {
               role: {
                 include: {
                   permissions: true,
+                 
                 },
               },
             },
@@ -288,6 +295,8 @@ const login = async (credentials) => {
     user: {
       ...userWithoutPassword,
       permissions: user.role.permissions.map((p) => p.name),
+      role: user.role.name,
+      roleName: formatRoleName(user.role.name),
     },
     accessToken,
     refreshToken: refreshTokenObj.token,
