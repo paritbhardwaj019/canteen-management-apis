@@ -249,6 +249,16 @@ model CanteenEntry {
   @@map("canteen_entries")
 }
 
+model Locations{ 
+  id String @id @default(uuid())
+  deviceName String
+  serialNumber String
+  locationType String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@map("locations")
+}
+
 enum CanteenEntryStatus {
   PENDING
   APPROVED
