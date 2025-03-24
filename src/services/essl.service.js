@@ -2,6 +2,8 @@ const axios = require("axios");
 const config = require("../config/config");
 const { badRequest, serverError } = require("../utils/api.error");
 const xml2js = require("xml2js");
+const { PrismaClient } = require("@prisma/client");
+const prisma = new PrismaClient();
 
 /**
  * Get all ESSL devices
@@ -16,7 +18,7 @@ const getAllDevices = async () => {
     <GetDeviceList xmlns="http://tempuri.org/">
       <UserName>${config.essl.username}</UserName>
       <Password>${config.essl.password}</Password>
-      <Location>1</Location>
+      <Location>Chennai</Location>
     </GetDeviceList>
   </soap:Body>
 </soap:Envelope>`;
@@ -272,11 +274,87 @@ const updateEmployeePhoto = async (photoData) => {
   }
 };
 
+// add new device in locations table
+const addNewLocation = async (locationData) => {
+  try {
+    const { deviceName, serialNumber, locationType } = locationData;
+    if (!deviceName || !serialNumber || !locationType) {
+      throw badRequest("Device Name, Serial Number and Location Type are required");
+    }
+
+    // check if the device already exists
+    const existingDevice = await prisma.locations.findFirst({
+      where: { serialNumber },
+    });
+    if (existingDevice) {
+      throw badRequest("Device already exists");
+    }
+    const newDevice = await prisma.locations.create({
+      data: {
+        deviceName,
+        serialNumber,
+        locationType,
+      },
+    });
+
+    return newDevice;
+  } catch (error) {
+    console.error("Error adding new device in locations table:", error);
+    if (error.response) {
+      throw badRequest(
+        `ESSL API Error: ${error.response.data || error.message}`
+      );
+    }
+    throw serverError(
+      `Error adding new device in locations table: ${error.message}`
+    );
+  }
+};
+
+const getAllLocations = async () => {
+  try {
+    const locations = await prisma.locations.findMany();
+    return locations;
+  } catch (error) {
+    console.error("Error fetching all locations:", error);
+    throw serverError(`Error fetching all locations: ${error.message}`);
+  }
+};
+
+const deleteLocation = async (id) => {
+  try {
+    const deletedLocation = await prisma.locations.delete({
+      where: { id },
+    });
+    return deletedLocation;
+  } catch (error) {
+    console.error("Error deleting location:", error);
+    throw serverError(`Error deleting location: ${error.message}`);
+  }
+};
+
+const updateLocation = async (id, locationData) => {
+  try {
+    const updatedLocation = await prisma.locations.update({
+      where: { id },
+      data: locationData,
+    });
+    return updatedLocation;
+  } catch (error) {
+    console.error("Error updating location:", error);
+    throw serverError(`Error updating location: ${error.message}`);
+  }
+};
+
 const esslService = {
   getAllDevices,
   getDeviceLogs,
   updateEmployee,
   updateEmployeePhoto,
+  addNewLocation,
+  getAllLocations,
+  deleteLocation,
+  updateLocation,
 };
 
 module.exports = esslService;
