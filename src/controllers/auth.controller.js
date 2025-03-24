@@ -3,12 +3,13 @@ const asyncHandler = require("../utils/async.handler");
 const { badRequest } = require("../utils/api.error");
 const ApiResponse = require("../utils/api.response");
 
-// register a new employee
 const registerEmployee = asyncHandler(async (req, res) => {
-  const { email, password, name, roleId, startDate, endDate, empCode } = req.body;
+  const { email, password, name, roleId, startDate, endDate, empCode } =
+    req.body;
 
   const result = await authService.registerEmployee({
     email,
+    password,
     name,
     roleId,
     startDate,
@@ -18,17 +19,18 @@ const registerEmployee = asyncHandler(async (req, res) => {
 
   return ApiResponse.created(res, "Employee registered successfully", {
     employee: result.employee,
+    roleName: result.roleName,
     accessToken: result.accessToken,
     refreshToken: result.refreshToken,
   });
 });
+
 /**
  * Register a new user
  */
 const register = asyncHandler(async (req, res) => {
   const { email, password, firstName, lastName, roleId, department } = req.body;
 
-  // Validate required fields
   if (!email || !password || !firstName || !lastName || !roleId) {
     throw badRequest("Missing required fields");
   }
@@ -42,16 +44,16 @@ const register = asyncHandler(async (req, res) => {
     department,
   });
 
-  // Set HTTP-only cookie with refresh token
   res.cookie("refreshToken", result.refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
   return ApiResponse.created(res, "User registered successfully", {
     user: result.user,
+    roleName: result.roleName,
     accessToken: result.accessToken,
     refreshToken: result.refreshToken,
     refreshTokenExpiry: result.refreshTokenExpiry,
@@ -64,23 +66,22 @@ const register = asyncHandler(async (req, res) => {
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  // Validate required fields
   if (!email || !password) {
     throw badRequest("Email and password are required");
   }
 
   const result = await authService.login({ email, password });
 
-  // Set HTTP-only cookie with refresh token
   res.cookie("refreshToken", result.refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
   return ApiResponse.ok(res, "Login successful", {
     user: result.user,
+    roleName: result.roleName,
     accessToken: result.accessToken,
     refreshToken: result.refreshToken,
     refreshTokenExpiry: result.refreshTokenExpiry,
@@ -91,7 +92,6 @@ const login = asyncHandler(async (req, res) => {
  * Refresh access token
  */
 const refreshAccessToken = asyncHandler(async (req, res) => {
-  // Get refresh token from cookie or request body
   const refreshToken = req.cookies.refreshToken || req.body.refreshToken;
 
   if (!refreshToken) {
@@ -100,12 +100,11 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
   const tokens = await authService.refreshToken(refreshToken);
 
-  // Set HTTP-only cookie with new refresh token
   res.cookie("refreshToken", tokens.refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
   return ApiResponse.ok(res, "Token refreshed successfully", {
@@ -138,7 +137,6 @@ const logoutAll = asyncHandler(async (req, res) => {
 
   await authService.logoutAll(userId);
 
-  // Clear refresh token cookie
   res.clearCookie("refreshToken");
 
   return ApiResponse.ok(res, "Logged out from all devices");
@@ -148,7 +146,6 @@ const logoutAll = asyncHandler(async (req, res) => {
  * Get current user profile
  */
 const getProfile = asyncHandler(async (req, res) => {
-  // User data is already attached to the request in authenticate middleware
   return ApiResponse.ok(res, "User profile retrieved successfully", {
     user: req.user,
   });

@@ -15,13 +15,23 @@ const {
   forbidden,
 } = require("../utils/api.error");
 
-// register a new employee
+/**
+ * Format role name to uppercase with underscores
+ * @param {String} roleName - Original role name
+ * @returns {String} Formatted role name
+ */
+const formatRoleName = (roleName) => {
+  if (!roleName) return "";
+  return roleName.toUpperCase().replace(/\s+/g, "_");
+};
+
 const registerEmployee = async (userData) => {
-  const { email, password, name, roleId, startDate, endDate, empCode } = userData;
+  const { email, password, name, roleId, startDate, endDate, empCode } =
+    userData;
   const existingEmployee = await prisma.employee.findUnique({
     where: { email: email, empCode: empCode },
   });
-  if(existingEmployee){
+  if (existingEmployee) {
     throw new ApiError(409, "Employee with this email already exists");
   }
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -29,11 +39,14 @@ const registerEmployee = async (userData) => {
     data: {
       email,
       password: hashedPassword,
-      name, 
+      name,
       empCode,
       startDate,
       endDate,
-      roleId : "cac87de3-96f9-4486-892f-27299fd6fa5b",
+      roleId: "cac87de3-96f9-4486-892f-27299fd6fa5b",
+    },
+    include: {
+      role: true,
     },
   });
 
@@ -51,6 +64,7 @@ const registerEmployee = async (userData) => {
 
   return {
     employee: employeeWithoutPassword,
+    roleName: formatRoleName(newEmployee.role.name),
     accessToken,
     refreshToken: refreshTokenObj.token, // Return just the token string
     refreshTokenExpiry: refreshTokenObj.expiresAt, // Optionally include expiry
@@ -63,9 +77,9 @@ const registerEmployee = async (userData) => {
  * @returns {Object} Newly created user, access token and refresh token
  */
 const register = async (userData) => {
-  const { email, password, firstName, lastName, roleId, department, type } = userData;
- 
-  // Check if user already exists
+  const { email, password, firstName, lastName, roleId, department, type } =
+    userData;
+
   const existingUser = await prisma.user.findUnique({
     where: { email },
   });
@@ -74,10 +88,8 @@ const register = async (userData) => {
     throw new ApiError(409, "User with this email already exists");
   }
 
-  // Hash password
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  // Create new user
   const newUser = await prisma.user.create({
     data: {
       email,
@@ -106,9 +118,10 @@ const register = async (userData) => {
 
   return {
     user: userWithoutPassword,
+    roleName: formatRoleName(newUser.role.name),
     accessToken,
-    refreshToken: refreshTokenObj.token, // Return just the token string
-    refreshTokenExpiry: refreshTokenObj.expiresAt, // Optionally include expiry
+    refreshToken: refreshTokenObj.token,
+    refreshTokenExpiry: refreshTokenObj.expiresAt,
   };
 };
 
@@ -163,6 +176,7 @@ const login = async (credentials) => {
       ...userWithoutPassword,
       permissions: user.role.permissions.map((p) => p.name),
     },
+    roleName: formatRoleName(user.role.name),
     accessToken,
     refreshToken: refreshTokenObj.token, // Return just the token string
     refreshTokenExpiry: refreshTokenObj.expiresAt, // Optionally include expiry
@@ -193,8 +207,8 @@ const refreshToken = async (token) => {
 
   return {
     accessToken,
-    refreshToken: newRefreshTokenObj.token, // Return just the token string
-    refreshTokenExpiry: newRefreshTokenObj.expiresAt, // Optionally include expiry
+    refreshToken: newRefreshTokenObj.token,
+    refreshTokenExpiry: newRefreshTokenObj.expiresAt,
   };
 };
 
