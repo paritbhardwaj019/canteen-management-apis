@@ -11,6 +11,42 @@ const { deleteFile } = require("../middlewares/upload.middleware");
 const esslService = require("./essl.service");
 
 /**
+ * Get employee columns for data table
+ * @param {String} userRole - User role for conditional columns
+ * @returns {Array} Array of column definitions
+ */
+const getEmployeeColumns = (userRole) => {
+  const baseColumns = [
+    { field: "photoUrl", headerName: "Photo", width: 100, renderCell: true },
+    { field: "employeeNo", headerName: "Employee No.", width: 150 },
+    { field: "name", headerName: "Name", width: 180 },
+    { field: "email", headerName: "Email", width: 200 },
+    { field: "department", headerName: "Department", width: 150 },
+    { field: "designation", headerName: "Designation", width: 150 },
+    { field: "status", headerName: "Status", width: 100 },
+    { field: "plant", headerName: "Plant", width: 150 },
+    { field: "role", headerName: "Role", width: 120 },
+    { field: "isEsslRegistered", headerName: "ESSL Registered", width: 150 },
+    { field: "createdAt", headerName: "Created At", width: 180 },
+  ];
+
+  if (
+    userRole === "Super Admin" ||
+    userRole === "Manager" ||
+    userRole === "HR"
+  ) {
+    baseColumns.push({
+      field: "actions",
+      headerName: "Actions",
+      width: 180,
+      renderCell: true,
+    });
+  }
+
+  return baseColumns;
+};
+
+/**
  * Create a new employee
  * @param {Object} employeeData - Employee data
  * @param {Boolean} registerInEssl - Whether to register employee in ESSL system
@@ -44,6 +80,7 @@ const createEmployee = async (
     photoBase64,
   } = esslOptions;
 
+  // Check if employee with the same employee number already exists
   const existingEmployee = await prisma.employee.findUnique({
     where: { employeeNo },
   });
@@ -54,7 +91,9 @@ const createEmployee = async (
     );
   }
 
+  // Create employee in a transaction
   const result = await prisma.$transaction(async (prisma) => {
+    // Find the Employee role
     const employeeRole = await prisma.role.findFirst({
       where: { name: "Employee" },
     });
@@ -84,11 +123,6 @@ const createEmployee = async (
         email,
         department,
         designation,
-        ...(photoUrl && {
-          photos: {
-            create: [{ url: photoUrl }],
-          },
-        }),
       },
       include: {
         user: {
@@ -107,11 +141,21 @@ const createEmployee = async (
             },
           },
         },
-        photos: true,
       },
     });
 
-    return { employee, user };
+    let photos = [];
+    if (photoUrl) {
+      const photo = await prisma.employeePhoto.create({
+        data: {
+          url: photoUrl,
+          employeeId: employee.id,
+        },
+      });
+      photos.push(photo);
+    }
+
+    return { employee, user, photos };
   });
 
   let esslRegistrationResult = null;
@@ -162,6 +206,9 @@ const createEmployee = async (
     }
   }
 
+  const photoUrlValue =
+    result.photos && result.photos.length > 0 ? result.photos[0].url : null;
+
   return {
     id: result.employee.id,
     userId: result.user.id,
@@ -173,7 +220,8 @@ const createEmployee = async (
     designation: result.employee.designation,
     isActive: result.user.isActive,
     isEsslRegistered: result.employee.isEsslRegistered || false,
-    photos: result.employee.photos,
+    photos: result.photos || [],
+    photoUrl: photoUrlValue,
     createdAt: result.employee.createdAt,
     esslRegistrationResult: esslRegistrationResult,
     esslPhotoResult: esslPhotoResult,
@@ -217,6 +265,7 @@ const getAllEmployees = async (options) => {
     search,
     department,
     includePhotos = false,
+    userRole = "Employee",
   } = options;
 
   const skip = (page - 1) * limit;
@@ -269,48 +318,44 @@ const getAllEmployees = async (options) => {
           },
         },
       },
-      ...(includePhotos && { photos: true }),
+      ...(includePhotos || { photos: true }), // Always include photos to get the photoUrl
     },
     skip,
     take: limit,
     orderBy: { employeeNo: "asc" },
   });
 
-  // Define table columns
-  const columns = [
-    { field: "employeeNo", headerName: "Employee No.", width: 150 },
-    { field: "name", headerName: "Name", width: 180 },
-    { field: "email", headerName: "Email", width: 200 },
-    { field: "department", headerName: "Department", width: 150 },
-    { field: "designation", headerName: "Designation", width: 150 },
-    { field: "status", headerName: "Status", width: 100 },
-    { field: "plant", headerName: "Plant", width: 150 },
-    { field: "role", headerName: "Role", width: 120 },
-    { field: "isEsslRegistered", headerName: "ESSL Registered", width: 150 },
-    { field: "createdAt", headerName: "Created At", width: 180 },
-  ];
+  const columns = getEmployeeColumns(userRole);
 
-  const formattedEmployees = employees.map((employee) => ({
-    id: employee.id,
-    userId: employee.userId,
-    employeeNo: employee.employeeNo,
-    name: `${employee.user.firstName} ${employee.user.lastName}`,
-    firstName: employee.user.firstName,
-    lastName: employee.user.lastName,
-    email: employee.email || employee.user.email,
-    department: employee.department || employee.user.department,
-    designation: employee.designation || "",
-    status: employee.user.isActive ? "Active" : "Inactive",
-    isActive: employee.user.isActive,
-    plant: employee.user.plant ? employee.user.plant.name : "",
-    plantId: employee.user.plant?.id,
-    plantCode: employee.user.plant?.plantCode,
-    role: employee.user.role.name,
-    roleId: employee.user.role.id,
-    isEsslRegistered: employee.isEsslRegistered,
-    ...(includePhotos && { photos: employee.photos }),
-    createdAt: employee.createdAt.toISOString(),
-  }));
+  const formattedEmployees = employees.map((employee) => {
+    const photoUrl =
+      employee.photos && employee.photos.length > 0
+        ? employee.photos[0].url
+        : null;
+
+    return {
+      id: employee.id,
+      userId: employee.userId,
+      employeeNo: employee.employeeNo,
+      name: `${employee.user.firstName} ${employee.user.lastName}`,
+      firstName: employee.user.firstName,
+      lastName: employee.user.lastName,
+      email: employee.email || employee.user.email,
+      department: employee.department || employee.user.department,
+      designation: employee.designation || "",
+      status: employee.user.isActive ? "Active" : "Inactive",
+      isActive: employee.user.isActive,
+      plant: employee.user.plant ? employee.user.plant.name : "",
+      plantId: employee.user.plant?.id,
+      plantCode: employee.user.plant?.plantCode,
+      role: employee.user.role.name,
+      roleId: employee.user.role.id,
+      isEsslRegistered: employee.isEsslRegistered,
+      photoUrl: photoUrl,
+      ...(includePhotos && { photos: employee.photos }),
+      createdAt: employee.createdAt.toISOString(),
+    };
+  });
 
   return {
     employees: formattedEmployees,
@@ -348,13 +393,19 @@ const getEmployeeById = async (id, includePhotos = false) => {
           },
         },
       },
-      ...(includePhotos && { photos: true }),
+      photos: true, // Always include photos to get photoUrl
     },
   });
 
   if (!employee) {
     throw notFound("Employee not found");
   }
+
+  // Get the first photo URL if available
+  const photoUrl =
+    employee.photos && employee.photos.length > 0
+      ? employee.photos[0].url
+      : null;
 
   return {
     id: employee.id,
@@ -367,7 +418,8 @@ const getEmployeeById = async (id, includePhotos = false) => {
     designation: employee.designation,
     isActive: employee.user.isActive,
     isEsslRegistered: employee.isEsslRegistered,
-    ...(includePhotos && { photos: employee.photos }),
+    photoUrl: photoUrl,
+    photos: includePhotos ? employee.photos : undefined,
     createdAt: employee.createdAt,
     updatedAt: employee.updatedAt,
   };
@@ -392,12 +444,19 @@ const getEmployeeByEmployeeNo = async (employeeNo) => {
           isActive: true,
         },
       },
+      photos: true, // Include photos to get photoUrl
     },
   });
 
   if (!employee) {
     return null;
   }
+
+  // Get the first photo URL if available
+  const photoUrl =
+    employee.photos && employee.photos.length > 0
+      ? employee.photos[0].url
+      : null;
 
   return {
     id: employee.id,
@@ -410,6 +469,7 @@ const getEmployeeByEmployeeNo = async (employeeNo) => {
     designation: employee.designation,
     isActive: employee.user.isActive,
     isEsslRegistered: employee.isEsslRegistered,
+    photoUrl: photoUrl,
   };
 };
 
@@ -453,6 +513,7 @@ const updateEmployee = async (
     where: { id },
     include: {
       user: true,
+      photos: true,
     },
   });
 
@@ -567,6 +628,12 @@ const updateEmployee = async (
     }
   }
 
+  // Get the first photo URL if available
+  const photoUrl =
+    result.employee.photos && result.employee.photos.length > 0
+      ? result.employee.photos[0].url
+      : null;
+
   return {
     id: result.employee.id,
     userId: result.user.id,
@@ -579,6 +646,7 @@ const updateEmployee = async (
     isActive: result.user.isActive,
     isEsslRegistered: result.employee.isEsslRegistered,
     photos: result.employee.photos,
+    photoUrl: photoUrl,
     updatedAt: result.employee.updatedAt,
     esslUpdateResult: esslUpdateResult,
     esslPhotoResult: esslPhotoResult,
@@ -612,6 +680,7 @@ const registerEmployeeInEssl = async (id, esslOptions = {}) => {
           lastName: true,
         },
       },
+      photos: true, // Include photos to get photoUrl
     },
   });
 
@@ -619,12 +688,19 @@ const registerEmployeeInEssl = async (id, esslOptions = {}) => {
     throw notFound("Employee not found");
   }
 
+  // Get the first photo URL if available
+  const photoUrl =
+    employee.photos && employee.photos.length > 0
+      ? employee.photos[0].url
+      : null;
+
   // Don't proceed if already registered
   if (employee.isEsslRegistered) {
     return {
       id: employee.id,
       employeeNo: employee.employeeNo,
       isEsslRegistered: true,
+      photoUrl: photoUrl,
       message: "Employee is already registered in ESSL system",
     };
   }
@@ -676,6 +752,7 @@ const registerEmployeeInEssl = async (id, esslOptions = {}) => {
         id: employee.id,
         employeeNo: employee.employeeNo,
         isEsslRegistered: true,
+        photoUrl: photoUrl,
         message: "Employee successfully registered in ESSL system",
         result: result,
         photoResult: photoResult,
@@ -685,6 +762,7 @@ const registerEmployeeInEssl = async (id, esslOptions = {}) => {
         id: employee.id,
         employeeNo: employee.employeeNo,
         isEsslRegistered: false,
+        photoUrl: photoUrl,
         message: "Failed to register employee in ESSL system",
         result: result,
       };
@@ -713,12 +791,19 @@ const updateEmployeePhotoInEssl = async (id, photoBase64) => {
           lastName: true,
         },
       },
+      photos: true, // Include photos to get photoUrl
     },
   });
 
   if (!employee) {
     throw notFound("Employee not found");
   }
+
+  // Get the first photo URL if available
+  const photoUrl =
+    employee.photos && employee.photos.length > 0
+      ? employee.photos[0].url
+      : null;
 
   if (!employee.isEsslRegistered) {
     throw badRequest(
@@ -739,6 +824,7 @@ const updateEmployeePhotoInEssl = async (id, photoBase64) => {
     return {
       id: employee.id,
       employeeNo: employee.employeeNo,
+      photoUrl: photoUrl,
       message:
         result && result.includes("success")
           ? "Employee photo successfully updated in ESSL system"
@@ -900,12 +986,24 @@ const getEmployeesByDepartment = async (department, page = 1, limit = 10) => {
     department: employee.department || employee.user.department,
     designation: employee.designation,
     isActive: employee.user.isActive,
-    photo: employee.photos.length > 0 ? employee.photos[0].url : null,
+    photoUrl: employee.photos.length > 0 ? employee.photos[0].url : null,
   }));
+
+  // Get columns for the table
+  const columns = [
+    { field: "photoUrl", headerName: "Photo", width: 100, renderCell: true },
+    { field: "employeeNo", headerName: "Employee No.", width: 150 },
+    { field: "firstName", headerName: "First Name", width: 150 },
+    { field: "lastName", headerName: "Last Name", width: 150 },
+    { field: "email", headerName: "Email", width: 220 },
+    { field: "department", headerName: "Department", width: 180 },
+    { field: "designation", headerName: "Designation", width: 180 },
+  ];
 
   return {
     employees: formattedEmployees,
     totalCount,
+    columns,
   };
 };
 
@@ -919,12 +1017,19 @@ const resetEmployeePassword = async (id) => {
     where: { id },
     include: {
       user: true,
+      photos: true, // Include photos to get photoUrl
     },
   });
 
   if (!employee) {
     throw notFound("Employee not found");
   }
+
+  // Get the first photo URL if available
+  const photoUrl =
+    employee.photos && employee.photos.length > 0
+      ? employee.photos[0].url
+      : null;
 
   // Generate a temporary password
   const tempPassword = Math.random().toString(36).slice(-8); // 8 character random string
@@ -943,6 +1048,7 @@ const resetEmployeePassword = async (id) => {
     employeeNo: employee.employeeNo,
     firstName: employee.user.firstName,
     lastName: employee.user.lastName,
+    photoUrl: photoUrl,
     tempPassword,
   };
 };
@@ -982,6 +1088,12 @@ const getCurrentEmployee = async (userId) => {
     throw notFound("Employee profile not found for current user");
   }
 
+  // Get the first photo URL if available
+  const photoUrl =
+    employee.photos && employee.photos.length > 0
+      ? employee.photos[0].url
+      : null;
+
   return {
     id: employee.id,
     userId: employee.userId,
@@ -993,7 +1105,7 @@ const getCurrentEmployee = async (userId) => {
     designation: employee.designation,
     role: employee.user.role,
     isActive: employee.user.isActive,
-    photo: employee.photos.length > 0 ? employee.photos[0].url : null,
+    photoUrl: photoUrl,
   };
 };
 
