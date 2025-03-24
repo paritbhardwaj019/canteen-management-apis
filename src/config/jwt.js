@@ -71,6 +71,7 @@ const findRefreshToken = async (token) => {
               permissions: true,
             },
           },
+          employee: true,
         },
       },
     },

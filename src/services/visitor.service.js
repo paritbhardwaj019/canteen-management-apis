@@ -43,20 +43,15 @@ const generateQRCode = async (ticketId) => {
  */
 
 const registerVisitorRequest = async (visitorData, userId, files) => {
-  console.log(visitorData, userId, files);
-
   const ticketId = generateTicketId();
   const visitDate = visitorData.visitDate
     ? new Date(visitorData.visitDate)
     : new Date();
 
-  // Create visitor request in database
   const visitorRequest = await prisma.visitorRequest.create({
     data: {
-    
-      
       userId: visitorData.hostId,
-      hostId: visitorData.hostId, 
+      hostId: visitorData.hostId,
       purpose: visitorData.purpose,
       company: visitorData.company,
       contactNumber: visitorData.contact,
@@ -393,9 +388,11 @@ const listVisitorRequests = async (filters = {}) => {
 /**
  * Handle visitor entry or exit
  * @param {string} ticketId - Ticket ID of the visitor
+ * @param {string} userId - User ID of the person handling the entry
+ * @param {boolean} isSuperAdmin - Whether the user is a super admin
  * @returns {Object} Entry details
  */
-const handleVisitorEntry = async (ticketId) => {
+const handleVisitorEntry = async (ticketId, userId, isSuperAdmin = false) => {
   const visitorRequest = await prisma.visitorRequest.findUnique({
     where: { ticketId },
     include: {
@@ -425,19 +422,21 @@ const handleVisitorEntry = async (ticketId) => {
     throw notFound("Visitor not found");
   }
 
-  if (visitorRequest.status !== "APPROVED") {
-    throw forbidden("Only approved visitors can enter/exit the premises");
-  }
+  if (!isSuperAdmin) {
+    if (visitorRequest.status !== "APPROVED") {
+      throw forbidden("Only approved visitors can enter/exit the premises");
+    }
 
-  const today = new Date();
-  const visitDate = new Date(visitorRequest.visitDate);
+    const today = new Date();
+    const visitDate = new Date(visitorRequest.visitDate);
 
-  if (
-    visitDate.getDate() !== today.getDate() ||
-    visitDate.getMonth() !== today.getMonth() ||
-    visitDate.getFullYear() !== today.getFullYear()
-  ) {
-    throw forbidden("Entry/exit is only allowed on the scheduled visit date");
+    if (
+      visitDate.getDate() !== today.getDate() ||
+      visitDate.getMonth() !== today.getMonth() ||
+      visitDate.getFullYear() !== today.getFullYear()
+    ) {
+      throw forbidden("Entry/exit is only allowed on the scheduled visit date");
+    }
   }
 
   const latestEntry = visitorRequest.entries[0];

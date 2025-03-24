@@ -306,6 +306,7 @@ const initializeDatabase = async () => {
             firstName: "Super",
             lastName: "Admin",
             roleId: superAdminRole.id,
+            code: "ADMIN",
           },
         });
 

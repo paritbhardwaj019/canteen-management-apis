@@ -8,8 +8,9 @@ const { v4: uuidv4 } = require("uuid");
  * Register a new visitor request
  */
 const registerVisitorRequest = asyncHandler(async (req, res) => {
-  const { purpose, company, contact, visitDate, email, firstName, lastName } = req.body;
-console.log(req.user)
+  const { purpose, company, contact, visitDate, email, firstName, lastName } =
+    req.body;
+  console.log(req.user);
   const actualVisitorId = "vis-" + uuidv4().slice(0, 12);
   console.log(actualVisitorId);
   // if ((!actualVisitorId || !purpose) && req.user.role !== "Visitor") {
@@ -119,7 +120,13 @@ const handleVisitorEntry = asyncHandler(async (req, res) => {
     throw badRequest("Ticket ID is required");
   }
 
-  const result = await visitorService.handleVisitorEntry(ticketId);
+  const isSuperAdmin = req.user.role === "Super Admin";
+
+  const result = await visitorService.handleVisitorEntry(
+    ticketId,
+    req.user.id,
+    isSuperAdmin
+  );
 
   return ApiResponse.ok(
     res,
