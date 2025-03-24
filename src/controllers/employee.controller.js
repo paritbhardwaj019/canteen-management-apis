@@ -1,5 +1,4 @@
 const employeeService = require("../services/employee.service");
-const esslService = require("../services/essl.service");
 const asyncHandler = require("../utils/async.handler");
 const { badRequest } = require("../utils/api.error");
 const ApiResponse = require("../utils/api.response");
@@ -17,51 +16,71 @@ const registerEmployee = asyncHandler(async (req, res) => {
     department,
     designation,
     password,
+    registerInEssl,
+    esslLocation,
+    esslRole,
+    esslVerificationType,
   } = req.body;
 
   if (!firstName || !lastName || !employeeNo) {
     throw badRequest("First name, last name, and employee number are required");
   }
 
-  const photoUrl = req.file ? req.file.path : null;
+  let photoUrl = null;
+  let photoBase64 = null;
 
-  const newEmployee = await employeeService.createEmployee({
-    email,
-    firstName,
-    lastName,
-    employeeNo,
-    department,
-    designation,
-    photoUrl,
-    password,
-  });
+  if (req.file) {
+    photoUrl = req.file.path;
 
-  let esslResult = null;
-  //   try {
-  //     esslResult = await esslService.registerEmployeeInEssl({
-  //       employeeNo,
-  //       firstName,
-  //       lastName,
-  //       department,
-  //     });
+    if (registerInEssl) {
+      try {
+        const fs = require("fs");
+        const fileBuffer = fs.readFileSync(req.file.path);
+        photoBase64 = `data:${req.file.mimetype};base64,${fileBuffer.toString(
+          "base64"
+        )}`;
+      } catch (error) {
+        console.error("Error converting file to base64:", error);
+      }
+    }
+  }
 
-  //     if (esslResult.success) {
-  //       await employeeService.updateEmployee(newEmployee.id, {
-  //         isEsslRegistered: true,
-  //       });
-  //       newEmployee.isEsslRegistered = true;
-  //     }
-  //   } catch (error) {
-  //     console.error("ESSL registration failed:", error);
-  //     // Continue without failing the API response
-  //   }
+  const esslOptions = registerInEssl
+    ? {
+        location: esslLocation,
+        role: esslRole,
+        verificationType: esslVerificationType,
+        photoBase64,
+      }
+    : {};
+
+  const newEmployee = await employeeService.createEmployee(
+    {
+      email,
+      firstName,
+      lastName,
+      employeeNo,
+      department,
+      designation,
+      photoUrl,
+      password,
+    },
+    registerInEssl,
+    esslOptions
+  );
 
   return ApiResponse.created(res, "Employee registered successfully", {
     employee: newEmployee,
-    // esslRegistration: esslResult || {
-    //   success: false,
-    //   message: "ESSL registration failed or not attempted",
-    // },
+    esslRegistration: registerInEssl
+      ? {
+          success: newEmployee.isEsslRegistered,
+          message: newEmployee.isEsslRegistered
+            ? "ESSL registration successful"
+            : "ESSL registration failed",
+          details: newEmployee.esslRegistrationResult,
+          photoDetails: newEmployee.esslPhotoResult,
+        }
+      : null,
   });
 });
 
@@ -70,29 +89,39 @@ const registerEmployee = asyncHandler(async (req, res) => {
  */
 const uploadEmployeePhoto = asyncHandler(async (req, res) => {
   const { id } = req.params;
+  const { updateEsslPhoto, photoBase64 } = req.body;
 
-  if (!req.file) {
-    throw badRequest("No file uploaded");
+  if (!req.file && !photoBase64) {
+    throw badRequest("No file uploaded or no base64 photo provided");
   }
 
-  const photoResult = await employeeService.addEmployeePhoto(id, req.file.path);
+  let photoResult = null;
+  if (req.file) {
+    photoResult = await employeeService.addEmployeePhoto(id, req.file.path);
+  }
 
   const employee = await employeeService.getEmployeeById(id);
 
   let esslResult = null;
-  //   try {
-  //     esslResult = await esslService.updateEmployeePhoto(
-  //       employee.employeeNo,
-  //       req.file.path
-  //     );
-  //   } catch (error) {}
+  if (updateEsslPhoto && photoBase64) {
+    try {
+      esslResult = await employeeService.updateEmployeePhotoInEssl(
+        id,
+        photoBase64
+      );
+    } catch (error) {
+      console.error("ESSL photo update failed:", error);
+    }
+  }
 
   return ApiResponse.ok(res, "Employee photo uploaded successfully", {
     photo: photoResult,
-    // esslUpdate: esslResult || {
-    //   success: false,
-    //   message: "ESSL photo update failed or not attempted",
-    // },
+    esslUpdate: updateEsslPhoto
+      ? esslResult || {
+          success: false,
+          message: "ESSL photo update failed or not attempted",
+        }
+      : null,
   });
 });
 
@@ -147,40 +176,90 @@ const updateEmployee = asyncHandler(async (req, res) => {
     department,
     designation,
     isActive,
+    updateInEssl,
+    esslLocation,
+    esslRole,
+    esslVerificationType,
+    photoBase64,
   } = req.body;
 
-  const updatedEmployee = await employeeService.updateEmployee(id, {
-    email,
-    firstName,
-    lastName,
-    employeeNo,
-    department,
-    designation,
-    isActive,
-  });
+  const esslOptions = updateInEssl
+    ? {
+        location: esslLocation,
+        role: esslRole,
+        verificationType: esslVerificationType,
+        photoBase64,
+      }
+    : {};
 
-  //   let esslResult = null;
-  //   if (employeeNo) {
-  //     try {
-  //       esslResult = await esslService.updateEmployeeInEssl({
-  //         employeeNo,
-  //         firstName,
-  //         lastName,
-  //         department,
-  //       });
-  //     } catch (error) {
-  //       console.error("ESSL update failed:", error);
-  //       // Continue without failing the API response
-  //     }
-  //   }
+  const updatedEmployee = await employeeService.updateEmployee(
+    id,
+    {
+      email,
+      firstName,
+      lastName,
+      employeeNo,
+      department,
+      designation,
+      isActive,
+    },
+    updateInEssl,
+    esslOptions
+  );
 
   return ApiResponse.ok(res, "Employee updated successfully", {
     employee: updatedEmployee,
-    // esslUpdate: esslResult || {
-    //   success: false,
-    //   message: "ESSL update not attempted",
-    // },
+    esslUpdate: updateInEssl
+      ? {
+          success:
+            updatedEmployee.esslUpdateResult &&
+            updatedEmployee.esslUpdateResult.includes("success"),
+          message:
+            updatedEmployee.esslUpdateResult &&
+            updatedEmployee.esslUpdateResult.includes("success")
+              ? "ESSL update successful"
+              : "ESSL update failed",
+          details: updatedEmployee.esslUpdateResult,
+          photoDetails: updatedEmployee.esslPhotoResult,
+        }
+      : null,
   });
+});
+
+/**
+ * Register an employee in ESSL system
+ */
+const registerEmployeeInEssl = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { location, role, verificationType, photoBase64 } = req.body;
+
+  const result = await employeeService.registerEmployeeInEssl(id, {
+    location,
+    role,
+    verificationType,
+    photoBase64,
+  });
+
+  return ApiResponse.ok(res, result.message, result);
+});
+
+/**
+ * Update employee photo in ESSL system
+ */
+const updateEmployeePhotoInEssl = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { photoBase64 } = req.body;
+
+  if (!photoBase64) {
+    throw badRequest("Base64 encoded photo data is required");
+  }
+
+  const result = await employeeService.updateEmployeePhotoInEssl(
+    id,
+    photoBase64
+  );
+
+  return ApiResponse.ok(res, result.message, result);
 });
 
 /**
@@ -193,20 +272,10 @@ const deleteEmployee = asyncHandler(async (req, res) => {
 
   await employeeService.deleteEmployee(id);
 
-  //   let esslResult = null;
-  //   try {
-  //     esslResult = await esslService.deleteEmployeeFromEssl(employee.employeeNo);
-  //   } catch (error) {
-  //     console.error("ESSL deletion failed:", error);
-  //     // Continue without failing the API response
-  //   }
+  // The ESSL service doesn't currently provide a method to delete employees from ESSL system
+  // If such functionality is needed, it should be implemented in the ESSL service first
 
-  return ApiResponse.ok(res, "Employee deleted successfully", {
-    // esslDeletion: esslResult || {
-    //   success: false,
-    //   message: "ESSL deletion failed or not attempted",
-    // },
-  });
+  return ApiResponse.ok(res, "Employee deleted successfully", {});
 });
 
 /**
@@ -234,38 +303,6 @@ const getEmployeesByDepartment = asyncHandler(async (req, res) => {
   );
 });
 
-// /**
-//  * Import employee from ESSL
-//  */
-// const importEmployeeFromEssl = asyncHandler(async (req, res) => {
-//   const { employeeNo } = req.body;
-
-//   if (!employeeNo) {
-//     throw badRequest("Employee number is required");
-//   }
-
-//   const esslEmployee = await esslService.getEmployeeFromEssl(employeeNo);
-
-//   if (!esslEmployee) {
-//     throw badRequest("Employee not found in ESSL system");
-//   }
-
-//   const newEmployee = await employeeService.createEmployee({
-//     firstName: esslEmployee.firstName,
-//     lastName: esslEmployee.lastName,
-//     employeeNo: esslEmployee.employeeNo,
-//     department: esslEmployee.department,
-//     isEsslRegistered: true,
-//     photoUrl: esslEmployee.photoUrl,
-//   });
-
-//   return ApiResponse.created(
-//     res,
-//     "Employee imported successfully from ESSL",
-//     newEmployee
-//   );
-// });
-
 module.exports = {
   registerEmployee,
   uploadEmployeePhoto,
@@ -274,5 +311,6 @@ module.exports = {
   updateEmployee,
   deleteEmployee,
   getEmployeesByDepartment,
-  //   importEmployeeFromEssl,
+  registerEmployeeInEssl,
+  updateEmployeePhotoInEssl,
 };

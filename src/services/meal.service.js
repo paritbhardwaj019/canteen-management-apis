@@ -9,7 +9,7 @@ const { notFound, conflict } = require("../utils/api.error");
  * @returns {Object} Newly created meal
  */
 const createMeal = async (mealData) => {
-  const { type, menuId, price } = mealData;
+  const { type, menuId, price, name, description } = mealData;
 
   const menu = await prisma.menu.findUnique({
     where: { id: menuId },
@@ -21,8 +21,8 @@ const createMeal = async (mealData) => {
 
   return await prisma.meal.create({
     data: {
-      name : "meal",
-      description : "meal",
+      name,
+      description,
       type,
       menuId,
       price,
@@ -55,7 +55,7 @@ const getAllMeals = async (filters = {}) => {
     where.isAvailable = isAvailable === "true" || isAvailable === true;
   }
 
-  const data =  await prisma.meal.findMany({
+  const data = await prisma.meal.findMany({
     where,
     include: {
       menu: true,
@@ -165,9 +165,6 @@ const deleteMeal = async (id) => {
   });
 };
 
-
-// menu creation and handling
-
 const createMenu = async (menuData) => {
   const { type, price, empContribution } = menuData;
 
@@ -184,7 +181,6 @@ const createMenu = async (menuData) => {
 };
 
 const getAllMenus = async (userRole) => {
-
   const data = await prisma.menu.findMany();
   return {
     data,
@@ -212,13 +208,11 @@ const updateMenu = async (id, menuData) => {
     newPrice = parseInt(price);
     newEmpContribution = parseInt(empContribution);
     newEmrContribution = newPrice - newEmpContribution;
-  } 
-  // Case 2: User updates only price - this is not allowed
-  else if (price !== undefined && empContribution === undefined) {
-    throw badRequest("Employee contribution (empContribution) must be provided when updating price");
-  }
-  // Case 3: User updates only empContribution
-  else if (empContribution !== undefined) {
+  } else if (price !== undefined && empContribution === undefined) {
+    throw badRequest(
+      "Employee contribution (empContribution) must be provided when updating price"
+    );
+  } else if (empContribution !== undefined) {
     newEmpContribution = parseInt(empContribution);
     newEmrContribution = newPrice - newEmpContribution;
   }
@@ -234,7 +228,7 @@ const updateMenu = async (id, menuData) => {
   });
 };
 
-const deleteMenu = async (id) => {  
+const deleteMenu = async (id) => {
   return await prisma.menu.delete({
     where: { id },
   });

@@ -140,9 +140,143 @@ const getDeviceLogs = async (date, location) => {
   }
 };
 
+/**
+ * Register or update an employee in the ESSL system
+ * @param {Object} employeeData - Employee data to be registered
+ * @param {String} employeeData.employeeCode - Employee number/code
+ * @param {String} employeeData.employeeName - Employee full name
+ * @param {String} employeeData.employeeLocation - Employee location
+ * @param {String} employeeData.employeeRole - Employee role
+ * @param {String} employeeData.employeeVerificationType - Verification type (e.g., "Card", "Fingerprint")
+ * @returns {Promise<String>} Registration result
+ */
+const updateEmployee = async (employeeData) => {
+  try {
+    const {
+      employeeCode,
+      employeeName,
+      employeeLocation = "Chennai",
+      employeeRole = "Normal User",
+      employeeVerificationType = "Finger or Face or Card or Password",
+    } = employeeData;
+
+    if (!employeeCode) {
+      throw badRequest("Employee code is required");
+    }
+
+    if (!employeeName) {
+      throw badRequest("Employee name is required");
+    }
+
+    const soapBody = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <UpdateEmployee xmlns="http://tempuri.org/">
+      <UserName>${config.essl.username}</UserName>
+      <Password>${config.essl.password}</Password>
+      <EmployeeCode>${employeeCode}</EmployeeCode>
+      <EmployeeName>${employeeName}</EmployeeName>
+      <EmployeeLocation>${employeeLocation}</EmployeeLocation>
+      <EmployeeRole>${employeeRole}</EmployeeRole>
+      <EmployeeVerificationType>${employeeVerificationType}</EmployeeVerificationType>
+    </UpdateEmployee>
+  </soap:Body>
+</soap:Envelope>`;
+
+    const response = await axios({
+      method: "post",
+      url: `${config.essl.bioServerUrl}/iclock/webservice.asmx?op=UpdateEmployee`,
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        SOAPAction: "http://tempuri.org/UpdateEmployee",
+      },
+      data: soapBody,
+    });
+
+    const parser = new xml2js.Parser({ explicitArray: false });
+    const result = await parser.parseStringPromise(response.data);
+
+    const updateResult =
+      result["soap:Envelope"]["soap:Body"].UpdateEmployeeResponse
+        .UpdateEmployeeResult;
+
+    return updateResult;
+  } catch (error) {
+    console.error("Error updating employee in ESSL system:", error);
+    if (error.response) {
+      throw badRequest(
+        `ESSL API Error: ${error.response.data || error.message}`
+      );
+    }
+    throw serverError(`Error connecting to ESSL server: ${error.message}`);
+  }
+};
+
+/**
+ * Update an employee's photo in the ESSL system
+ * @param {Object} photoData - Employee photo data
+ * @param {String} photoData.employeeCode - Employee number/code
+ * @param {String} photoData.employeePhoto - Base64 encoded photo data
+ * @returns {Promise<String>} Photo update result
+ */
+const updateEmployeePhoto = async (photoData) => {
+  try {
+    const { employeeCode, employeePhoto } = photoData;
+
+    if (!employeeCode) {
+      throw badRequest("Employee code is required");
+    }
+
+    if (!employeePhoto) {
+      throw badRequest("Employee photo (base64) is required");
+    }
+
+    const soapBody = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <UpdateEmployeePhoto xmlns="http://tempuri.org/">
+      <UserName>${config.essl.username}</UserName>
+      <Password>${config.essl.password}</Password>
+      <EmployeeCode>${employeeCode}</EmployeeCode>
+      <EmployeePhoto>${employeePhoto}</EmployeePhoto>
+    </UpdateEmployeePhoto>
+  </soap:Body>
+</soap:Envelope>`;
+
+    const response = await axios({
+      method: "post",
+      url: `${config.essl.bioServerUrl}/iclock/webservice.asmx?op=UpdateEmployeePhoto`,
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        SOAPAction: "http://tempuri.org/UpdateEmployeePhoto",
+      },
+      data: soapBody,
+    });
+
+    const parser = new xml2js.Parser({ explicitArray: false });
+    const result = await parser.parseStringPromise(response.data);
+
+    const updateResult =
+      result["soap:Envelope"]["soap:Body"].UpdateEmployeePhotoResponse
+        .UpdateEmployeePhotoResult;
+
+    return updateResult;
+  } catch (error) {
+    console.error("Error updating employee photo in ESSL system:", error);
+    if (error.response) {
+      throw badRequest(
+        `ESSL API Error: ${error.response.data || error.message}`
+      );
+    }
+    throw serverError(`Error connecting to ESSL server: ${error.message}`);
+  }
+};
+
 const esslService = {
   getAllDevices,
   getDeviceLogs,
+  updateEmployee,
+  updateEmployeePhoto,
 };
 
 module.exports = esslService;
