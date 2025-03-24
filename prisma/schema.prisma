@@ -126,7 +126,7 @@ model Plant {
   createdBy    User?    @relation("PlantCreatedBy", fields: [createdById], references: [id])
   updatedById  String?
   updatedBy    User?    @relation("PlantUpdatedBy", fields: [updatedById], references: [id])
-
+  mealRequests MealRequest[] @relation("PlantMealRequests")
   @@map("plants")
 }
 
@@ -152,6 +152,7 @@ model MealRequest {
   totalPrice  Float?
   notes       String?
   status      RequestStatus @default(PENDING)
+  plantId     String?
   approvedBy  String?
   approvedAt  DateTime?
   rejectedBy  String?
@@ -166,6 +167,7 @@ model MealRequest {
   rejector    User?         @relation("RejectorRequests", fields: [rejectedBy], references: [id])
   user        User          @relation("EmployeeRequests", fields: [userId], references: [id])
   employee    Employee?     @relation("EmployeeMealRequests", fields: [employeeId], references: [id])
+  plant       Plant?        @relation("PlantMealRequests", fields: [plantId], references: [id])
 
   @@index([approvedBy], map: "meal_requests_approvedBy_fkey")
   @@index([menuId], map: "meal_requests_menuId_fkey")
