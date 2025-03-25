@@ -33,15 +33,15 @@ const upload = multer({
 }).single('photo'); // Explicitly define the field name here
 
 // Detailed request logging middleware
-const logRequest = (req, res, next) => {
-  console.log('=== Detailed Request Debug ===');
-  console.log('Headers:', req.headers);
-  console.log('Content-Type:', req.headers['content-type']);
-  console.log('Body keys:', Object.keys(req.body || {}));
-  console.log('Files:', req.files);
-  console.log('File:', req.file);
-  next();
-};
+// const logRequest = (req, res, next) => {
+//   console.log('=== Detailed Request Debug ===');
+//   console.log('Headers:', req.headers);
+//   console.log('Content-Type:', req.headers['content-type']);
+//   console.log('Body keys:', Object.keys(req.body || {}));
+//   console.log('Files:', req.files);
+//   console.log('File:', req.file);
+//   next();
+// };
 
 router.get(
   "/status/:ticketId",
@@ -64,7 +64,6 @@ router.get(
 router.post(
   "/request/add",
   authenticate,
-  logRequest,
   (req, res, next) => {
     upload(req, res, function(err) {
       console.log('=== Upload Middleware Execution ===');
@@ -82,8 +81,8 @@ router.post(
         });
       }
       
-      console.log('Upload successful');
-      console.log('File details:', req.file);
+      // console.log('Upload successful');
+      // console.log('File details:', req.file);
       next();
     });
   },
