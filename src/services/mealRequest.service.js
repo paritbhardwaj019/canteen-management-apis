@@ -477,7 +477,7 @@ const getMealRequestSummary = async (filters, user) => {
   );
 
   return {
-    data: tabledata,
+    data: tabledata.data,
     columns: getMealRequestColumns('Employee'),
     heading: {
       totalEmployees,
