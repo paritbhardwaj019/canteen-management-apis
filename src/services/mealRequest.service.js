@@ -183,8 +183,8 @@ const getAllMealRequests = async (filters, userId, permissions, userRole) => {
     return {
       ...request,
       menuName: request.menu.name,
-      menuEmpContribution: request.menu.empContribution,
-      menuEmrContribution: request.menu.emrContribution,
+    empContribution: request.menu.empContribution,
+      emrContribution: request.menu.emrContribution,
       menuPrice: request.menu.price,
       menuType: request.menu.type,
       name: request.user.firstName + " " + request.user.lastName,
