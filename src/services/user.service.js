@@ -50,6 +50,13 @@ const getAllUsers = async (filters = {}) => {
       roleId: true,
       createdAt: true,
       updatedAt: true,
+      plant : {
+        select: {
+          id: true,
+          name: true,
+          plantCode: true,
+        },
+      },
       role: {
         select: {
           id: true,
@@ -65,10 +72,13 @@ const getAllUsers = async (filters = {}) => {
 
   // Transform the users array to include roleName at the top level
   const transformedUsers = users.map(user => {
-    const { role, ...rest } = user;
+    const { role, plant, ...rest } = user;
     return {
       ...rest,
       roleName: role.name,
+      plantName: plant?.name || 'N/A',
+      plantCode: plant?.plantCode || 'N/A',
+      name: `${user.firstName} ${user.lastName}`,
       role
     };
   });

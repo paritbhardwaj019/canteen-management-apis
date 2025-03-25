@@ -310,6 +310,19 @@ const getEmployeesByDepartment = asyncHandler(async (req, res) => {
   );
 });
 
+
+/**
+ * Disable an employee
+ */
+const disableEmployee = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  const employee = await employeeService.disableEmployee(id, status);
+
+  return ApiResponse.ok(res, "Employee disabled successfully", employee);
+});
+
 module.exports = {
   registerEmployee,
   uploadEmployeePhoto,
@@ -320,4 +333,5 @@ module.exports = {
   getEmployeesByDepartment,
   registerEmployeeInEssl,
   updateEmployeePhotoInEssl,
+  disableEmployee,
 };

@@ -269,7 +269,7 @@ const addEmployeePhoto = async (employeeId, photoUrl) => {
 const getAllEmployees = async (options) => {
   const {
     page = 1,
-    limit = 10,
+    limit = 1000,
     search,
     department,
     includePhotos = false,
@@ -298,6 +298,8 @@ const getAllEmployees = async (options) => {
 
   // Count total employees matching criteria
   const totalCount = await prisma.employee.count({ where });
+  // where.isActive = true;
+  where.user = { isActive: false };
 
   // Get employees with pagination
   const employees = await prisma.employee.findMany({
@@ -329,7 +331,7 @@ const getAllEmployees = async (options) => {
       ...(includePhotos || { photos: true }), // Always include photos to get the photoUrl
     },
     skip,
-    take: limit,
+    take: 1000,
     orderBy: { employeeNo: "asc" },
   });
 
@@ -1117,6 +1119,26 @@ const getCurrentEmployee = async (userId) => {
   };
 };
 
+/**
+ * Disable an employee
+ * @param {String} id - Employee ID
+ */
+const disableEmployee = async (id, status) => {
+  console.log(status, id);
+
+  try {
+    const existingEmployee = await prisma.employee.findUnique({ where: { id } });
+    if (!existingEmployee) {
+      throw notFound("Employee not found");
+    }
+    const employee = await prisma.user.update({ where: { id: existingEmployee.userId }, data: { isActive: status === "true" ? true : false } });
+    return employee;
+  } catch (error) {
+    console.error("Error disabling employee:", error);
+    throw serverError("Failed to disable employee");
+  }
+};
+
 module.exports = {
   createEmployee,
   addEmployeePhoto,
@@ -1130,5 +1152,6 @@ module.exports = {
   resetEmployeePassword,
   getCurrentEmployee,
   registerEmployeeInEssl,
+  disableEmployee,
   updateEmployeePhotoInEssl,
 };
