@@ -42,72 +42,100 @@ const generateQRCode = async (ticketId) => {
  * @returns {Object} Visitor request details with ticket ID and QR code
  */
 
-const registerVisitorRequest = async (visitorData, userId, files) => {
+const registerVisitorRequest = async (visitorData, userId) => {
+  console.log('=== Visitor Service Debug ===');
+  console.log('Received visitor data:', {
+    ...visitorData,
+    photoPresent: !!visitorData.photo
+  });
+
   const ticketId = generateTicketId();
+  console.log('Generated ticket ID:', ticketId);
+
   const visitDate = visitorData.visitDate
     ? new Date(visitorData.visitDate)
     : new Date();
 
-  const visitorRequest = await prisma.visitorRequest.create({
-    data: {
-      userId: visitorData.hostId,
-      hostId: visitorData.hostId,
-      purpose: visitorData.purpose,
-      company: visitorData.company,
-      contactNumber: visitorData.contact,
-      visitDate,
-      ticketId,
-      status: "PENDING",
-      createdById: visitorData.hostId,
-    },
-    include: {
-      user: {
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-        },
-      },
-      host: {
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          department: true,
-        },
-      },
-      createdBy: {
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-        },
-      },
-    },
+  // Debug data being sent to database
+  const createData = {
+    userId: visitorData.hostId,
+    hostId: visitorData.hostId,
+    purpose: visitorData.purpose,
+    company: visitorData.company,
+    contactNumber: visitorData.contact,
+    visitDate,
+    ticketId,
+    status: "APPROVED",
+    createdById: visitorData.hostId,
+    photo: visitorData.photo
+  };
+
+  console.log('Data being sent to database:', {
+    ...createData,
+    photoLength: createData.photo ? createData.photo.length : 0
   });
 
-  const qrCodeUrl = await generateQRCode(ticketId);
+  try {
+    const visitorRequest = await prisma.visitorRequest.create({
+      data: createData,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+        host: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            department: true,
+          },
+        },
+        createdBy: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
 
-  return {
-    ticketId: visitorRequest.ticketId,
-    qrCodeUrl,
-    status: visitorRequest.status,
-    visitor: {
-      id: visitorRequest.userId,
-      name: `${visitorRequest.user.firstName} ${visitorRequest.user.lastName}`.trim(),
-      email: visitorRequest.user.email,
-      contact: visitorRequest.contactNumber,
-      company: visitorRequest.company,
-      purpose: visitorRequest.purpose,
-      visitDate: visitorRequest.visitDate,
-      host: `${visitorRequest.host.firstName} ${visitorRequest.host.lastName}`.trim(),
-      department: visitorRequest.host.department,
-    },
-  };
+    console.log('Database response:', {
+      ticketId: visitorRequest.ticketId,
+      photoSaved: !!visitorRequest.photo
+    });
+
+    const qrCodeUrl = await generateQRCode(ticketId);
+
+    return {
+      ticketId: visitorRequest.ticketId,
+      qrCodeUrl,
+      status: visitorRequest.status,
+      visitor: {
+        id: visitorRequest.userId,
+        name: `${visitorRequest.user.firstName} ${visitorRequest.user.lastName}`.trim(),
+        email: visitorRequest.user.email,
+        contact: visitorRequest.contactNumber,
+        company: visitorRequest.company,
+        purpose: visitorRequest.purpose,
+        visitDate: visitorRequest.visitDate,
+        host: `${visitorRequest.host.firstName} ${visitorRequest.host.lastName}`.trim(),
+        department: visitorRequest.host.department,
+        photo: visitorRequest.photo,
+      },
+    };
+  } catch (error) {
+    console.error('Error creating visitor request:', error);
+    throw error;
+  }
 };
 
 /**
@@ -316,7 +344,10 @@ const listVisitorRequests = async (filters = {}) => {
       { ticketId: { contains: search } },
     ];
   }
+  const visitorsCount = await prisma.visitorRequest.count({
 
+  });
+  console.log('Visitors count:', visitorsCount);
   const visitorRequests = await prisma.visitorRequest.findMany({
     where: whereClause,
     include: {
@@ -349,7 +380,7 @@ const listVisitorRequests = async (filters = {}) => {
         orderBy: {
           entryTime: "desc",
         },
-        take: 1,
+
       },
     },
     orderBy: {
@@ -358,6 +389,7 @@ const listVisitorRequests = async (filters = {}) => {
   });
 
   return {
+    visitorsCount: visitorsCount,
     count: visitorRequests.length,
     items: visitorRequests.map((request) => ({
       id: request.id,
@@ -623,7 +655,7 @@ const findVisitors = async (searchTerm) => {
     include: {
       visitorProfile: true,
     },
-    take: 10,
+    take: 1000,
   });
 
   return {
