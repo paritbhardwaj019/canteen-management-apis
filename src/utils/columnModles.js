@@ -4,9 +4,8 @@ const getUserColumns = (userRole) => {
     { field: "plantCode", headerName: "Plant Code", width: 150 },
     { field: "plantName", headerName: "Plant", width: 150 },
     { field: "name", headerName: "Name", width: 150 },
-    { field: "email", headerName: "Employee Code", width: 150 },
-    { field: "code", headerName: "Employee Code", width: 150 },
-    { field: "mobileNumber", headerName: "Mobile Number", width: 150 },
+    { field: "email", headerName: "User Email", width: 150 },
+    { field: "code", headerName: "User Code", width: 150 },
     { field: "roleName", headerName: "Role", width: 150 },
     { field: "createdAt", headerName: "Created At", width: 150 },
   ];
@@ -53,8 +52,9 @@ const getMealRequestColumns = (userRole) => {
     { field: "date", headerName: "Date", width: 150 },
     { field: "quantity", headerName: "Quantity", width: 150 },
     { field: "totalPrice", headerName: "Total Price", width: 150 },
-    { field: "mealType", headerName: "Meal Type", width: 150 },
     { field: "status", headerName: "Status", width: 150 },
+    { field: "employeeName", headerName: "Employee Name", width: 150 }, 
+    { field: "mealName", headerName: "Meal Name", width: 150 },
     {
       field: "empContribution",
       headerName: "Employee Contribution",

@@ -20,7 +20,7 @@ const createMealRequest = async (requestData, userId) => {
     employeeCode , 
     plantId
   } = requestData;
-  console.log("plant id is", plantId);
+  // console.log("plant id is", plantId);
   
   // Validate menu
   const menu = await prisma.menu.findUnique({
@@ -173,6 +173,7 @@ const getAllMealRequests = async (filters, userId, permissions, userRole) => {
         },
       },
       menu: true,
+      plant: true,
     },
     orderBy: {
       createdAt: "desc",
@@ -183,11 +184,13 @@ const getAllMealRequests = async (filters, userId, permissions, userRole) => {
     return {
       ...request,
       menuName: request.menu.name,
-      menuEmpContribution: request.menu.empContribution,
-      menuEmrContribution: request.menu.emrContribution,
+      empContribution: request.menu.empContribution,
+      emrContribution: request.menu.emrContribution,
       menuPrice: request.menu.price,
-      menuType: request.menu.type,
-      name: request.user.firstName + " " + request.user.lastName,
+      employeeName: request.user.firstName + " " + request.user.lastName,
+      mealName: request.menu.name || 'Veg Meal',
+      plantName: request.plant?.name  || 'N/A',
+      plantCode: request.plant?.plantCode || 'N/A',
     };
   });
 
@@ -439,11 +442,6 @@ const getMealRequestSummary = async (filters, user) => {
     },
   });
 
-  const mealTypeCounts = {};
-  mealRequests.forEach((request) => {
-    const type = request.menu.type.toLowerCase();
-    mealTypeCounts[type] = (mealTypeCounts[type] || 0) + 1;
-  });
 
   const approvedRequests = await prisma.mealRequest.findMany({
     where: {
@@ -451,46 +449,41 @@ const getMealRequestSummary = async (filters, user) => {
     },
   });
 
-  const totalApprovedAmount = approvedRequests.reduce(
-    (sum, request) => sum + (request.totalPrice || 0),
-    0
-  );
+
   
   const totalEmployees = await prisma.employee.count({
   });
 
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toUTCString().split("T")[0];
 
   const tabledata =  await getAllMealRequests(
     {
       status: 'APPROVED',
       userId: user.id,
-      date: today,
-      from: today,
-      to: today
+      date: today
     },
     user.id,
     user.permissions,
     user.role
   );
+console.log(tabledata);
 
+const totalVisitors = await prisma.visitorRequest.count({})
   return {
-    data: tabledata.transformedData,
+    tableData: tabledata.data,
     columns: getMealRequestColumns('Employee'),
     heading: {
       totalEmployees,
       totalRequests: mealRequests.length,
-      totalLunchRequests: mealTypeCounts.lunch,
-
-      totalDinnerRequests: mealTypeCounts.dinner,
+      totalMealsRequest:5,
+      totalVisitors,
     },
     summary: {
       totalEmployees,
       totalRequests: mealRequests.length,
-      totalLunchRequests: mealTypeCounts.lunch,
-      totalDinnerRequests: mealTypeCounts.dinner,
-      totalRequests: mealRequests.length,
+      totalMealsRequest:5,
+      totalVisitors,
       from: from || null,
       to: to || null
     },

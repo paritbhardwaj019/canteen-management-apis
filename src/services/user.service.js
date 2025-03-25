@@ -50,6 +50,7 @@ const getAllUsers = async (filters = {}) => {
       roleId: true,
       createdAt: true,
       updatedAt: true,
+      
       plant : {
         select: {
           id: true,
