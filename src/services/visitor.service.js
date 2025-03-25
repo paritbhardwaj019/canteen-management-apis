@@ -1,4 +1,5 @@
 const { PrismaClient } = require("@prisma/client");
+const { getVisitorRequestColumns } = require("../utils/columnModles");
 const prisma = new PrismaClient();
 const { v4: uuidv4 } = require("uuid");
 const {
@@ -50,7 +51,7 @@ const registerVisitorRequest = async (visitorData, userId) => {
   });
 
   const ticketId = generateTicketId();
-  console.log('Generated ticket ID:', ticketId);
+  console.log('Generated ticket ID:', visitorData);
 
   const visitDate = visitorData.visitDate
     ? new Date(visitorData.visitDate)
@@ -65,6 +66,7 @@ const registerVisitorRequest = async (visitorData, userId) => {
     contactNumber: visitorData.contact,
     visitDate,
     ticketId,
+    plantId: visitorData.plantId,
     status: "APPROVED",
     createdById: visitorData.hostId,
     photo: visitorData.photo
@@ -103,6 +105,12 @@ const registerVisitorRequest = async (visitorData, userId) => {
             email: true,
             firstName: true,
             lastName: true,
+          },
+        },
+        plant: {
+          select: {
+            id: true,
+            name: true,
           },
         },
       },
@@ -344,10 +352,8 @@ const listVisitorRequests = async (filters = {}) => {
       { ticketId: { contains: search } },
     ];
   }
-  const visitorsCount = await prisma.visitorRequest.count({
 
-  });
-  console.log('Visitors count:', visitorsCount);
+
   const visitorRequests = await prisma.visitorRequest.findMany({
     where: whereClause,
     include: {
@@ -376,6 +382,14 @@ const listVisitorRequests = async (filters = {}) => {
           lastName: true,
         },
       },
+
+      plant: {
+        select: {
+          id: true,
+          name: true,
+          plantCode: true,
+        },
+      },
       entries: {
         orderBy: {
           entryTime: "desc",
@@ -388,8 +402,8 @@ const listVisitorRequests = async (filters = {}) => {
     },
   });
 
-  return {
-    visitorsCount: visitorsCount,
+    return {
+    columns:getVisitorRequestColumns(),
     count: visitorRequests.length,
     items: visitorRequests.map((request) => ({
       id: request.id,
@@ -413,6 +427,9 @@ const listVisitorRequests = async (filters = {}) => {
         request.entries[0].entryTime &&
         !request.entries[0].exitTime,
       createdAt: request.createdAt,
+      // plantId: request.plantId,
+      plantName: request.plant?.name || 'N/A',
+      plantCode: request.plant?.plantCode || 'N/A',
     })),
   };
 };

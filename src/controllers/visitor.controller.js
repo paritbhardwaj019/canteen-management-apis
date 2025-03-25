@@ -17,16 +17,16 @@ const registerVisitorRequest = asyncHandler(async (req, res) => {
   console.log('Single File:', req.file);
   console.log('Request Body:', req.body);
   
-  const { purpose, company, contact, visitDate, email, firstName, lastName, visitorCount } = req.body;
+  const { purpose, company, contact, visitDate, email, firstName, lastName, visitorCount, plantId } = req.body;
   
   let photoBase64 = null;
   
   // Debug photo processing
   if (req.file) {
-    console.log('Photo detected:');
-    console.log('- Filename:', req.file.originalname);
-    console.log('- Mimetype:', req.file.mimetype);
-    console.log('- Size:', req.file.size, 'bytes');
+    // console.log('Photo detected:');
+    // console.log('- Filename:', req.file.originalname);
+    // console.log('- Mimetype:', req.file.mimetype);
+    // console.log('- Size:', req.file.size, 'bytes');
     
     try {
       const buffer = req.file.buffer;
@@ -34,33 +34,19 @@ const registerVisitorRequest = asyncHandler(async (req, res) => {
       photoBase64 = `data:${mimeType};base64,${buffer.toString('base64')}`;
       
       // Debug base64 conversion
-      console.log('Base64 conversion successful');
-      console.log('Base64 string length:', photoBase64.length);
-      console.log('First 100 chars of base64:', photoBase64.substring(0, 100));
+      // console.log('Base64 conversion successful');
+      // console.log('Base64 string length:', photoBase64.length);
+      // console.log('First 100 chars of base64:', photoBase64.substring(0, 100));
     } catch (error) {
-      console.error('Error converting photo to base64:', error);
+      // console.error('Error converting photo to base64:', error);
     }
   } else {
-    console.log('No photo file detected in request');
+    // console.log('No photo file detected in request');
   }
 
   const actualVisitorId = "vis-" + uuidv4().slice(0, 12);
-  console.log('Generated Visitor ID:', actualVisitorId);
+  // console.log('Generated Visitor ID:', actualVisitorId);
 
-  // Log data being sent to service
-  console.log('Data being sent to service:', {
-    visitorId: actualVisitorId,
-    purpose,
-    company,
-    contact,
-    hostId: req.user.id,
-    visitDate,
-    email,
-    firstName,
-    lastName,
-    visitorCount,
-    photoPresent: !!photoBase64
-  });
 
   const result = await visitorService.registerVisitorRequest(
     {
@@ -73,17 +59,18 @@ const registerVisitorRequest = asyncHandler(async (req, res) => {
       email,
       firstName,
       lastName,
-      visitorCount,
-      photo: photoBase64
+      plantId: plantId || null,
+      visitorCount: visitorCount || 1,
+      photo: photoBase64 || null
     },
     req.user.id
   );
 
-  // Debug final result
-  console.log('Registration result:', {
-    ticketId: result.ticketId,
-    photoSaved: !!result.visitor.photo
-  });
+  // // Debug final result
+  // console.log('Registration result:', {
+  //   ticketId: result.ticketId,
+  //   photoSaved: !!result.visitor.photo
+  // });
 
   if (result.visitor && result.visitor.photo) {
     result.visitor.photoUrl = `/api/visitors/${result.ticketId}/photo`;

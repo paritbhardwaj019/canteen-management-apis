@@ -92,12 +92,15 @@ const getCanteenReportColumns = () => {
 
 const getVisitorRequestColumns = () => {
   return [
+    { field: "plantName", headerName: "Plant", width: 150 },
+    { field: "plantCode", headerName: "Plant Code", width: 150 },
+    { field: "visitDate", headerName: "Visit Date", width: 150 },
     { field: "visitorName", headerName: "Visitor Name", width: 150 },
     { field: "company", headerName: "Company", width: 150 },
     { field: "contact", headerName: "Contact", width: 150 },
     { field: "visitorEmail", headerName: "Email", width: 150 },
     { field: "purpose", headerName: "Purpose", width: 150 },
-    { field: "visitDate", headerName: "Visit Date", width: 150 },
+  
     { field: "host", headerName: "Host", width: 150 },
     { field: "status", headerName: "Status", width: 150 },
     { field: "photo", headerName: "Photo", width: 150 },
