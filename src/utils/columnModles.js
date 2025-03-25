@@ -53,7 +53,7 @@ const getMealRequestColumns = (userRole) => {
     { field: "quantity", headerName: "Quantity", width: 150 },
     { field: "totalPrice", headerName: "Total Price", width: 150 },
     { field: "status", headerName: "Status", width: 150 },
-    { field: "employeeName", headerName: "Employee Name", width: 150 }, 
+    { field: "name", headerName: "Employee Name", width: 150 }, 
     { field: "mealName", headerName: "Meal Name", width: 150 },
     {
       field: "empContribution",
