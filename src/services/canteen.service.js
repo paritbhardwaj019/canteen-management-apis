@@ -302,3 +302,9 @@ module.exports = {
   approveEntry,
   getCanteenReport,
 };
+
+// total monthly
+// total employees
+// total requests
+// total meals
+// total visitors

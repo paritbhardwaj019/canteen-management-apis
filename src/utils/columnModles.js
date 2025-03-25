@@ -68,10 +68,10 @@ const getMealRequestColumns = (userRole) => {
     { field: "createdAt", headerName: "Created At", width: 150 },
   ];
 
-  if (userRole !== "Employee") {
-    baseColumns.push({ field: "approve", headerName: "Approve", width: 150 });
-    baseColumns.push({ field: "reject", headerName: "Reject", width: 150 });
-  }
+  // if (userRole !== "Employee") {
+  //   baseColumns.push({ field: "approve", headerName: "Approve", width: 150 });
+  //   baseColumns.push({ field: "reject", headerName: "Reject", width: 150 });
+  // }
 
   return baseColumns;
 };
@@ -82,9 +82,9 @@ const getCanteenReportColumns = () => {
     { field: "plantCode", headerName: "Plant Code", width: 150 },
     { field: "date", headerName: "Date", width: 150 },
     { field: "employeeNo", headerName: "Employee No", width: 150 },
-    { field: "name", headerName: "Employee Name", width: 150 },
+    { field: "employeeName", headerName: "Employee Name", width: 150 },
     { field: "quantity", headerName: "Quantity", width: 150 },
-    { field: "totalPrice", headerName: "Total Price", width: 150 }, 
+    { field: "price", headerName: "Total Price", width: 150 }, 
     { field: "employerContribution", headerName: "Employer Contribution", width: 150 },
     { field: "employeeContribution", headerName: "Employee Contribution", width: 150 },
    
