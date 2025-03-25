@@ -464,12 +464,15 @@ const getMealRequestSummary = async (filters, user) => {
   });
 
   const today = new Date().toUTCString().split("T")[0];
-
+  const mealEntrys = await prisma.canteenEntry.count({
+  });
   const tabledata =  await getAllMealRequests(
     {
       status: 'APPROVED',
       userId: user.id,
       date: today,
+      from: from,
+      to: to
     },
     user.id,
     user.permissions,
@@ -483,13 +486,13 @@ const getMealRequestSummary = async (filters, user) => {
       totalEmployees,
       totalRequests: mealRequests.length,
       totalVisitors,
-      totalMeals: 5,
+      totalMeals: mealEntrys
     },
     summary: {
       totalEmployees,
       totalRequests: mealRequests.length,
       totalVisitors,
-      totalMeals: 5,
+      totalMeals: mealEntrys,
       from: from || null,
       to: to || null
     },
