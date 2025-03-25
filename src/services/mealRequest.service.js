@@ -203,7 +203,7 @@ const getAllMealRequests = async (filters, userId, permissions, userRole) => {
   console.log(summary);
   
   return {
-    transformedData,
+    data: transformedData,
     summary,
     columns: getMealRequestColumns(userRole),
   };
