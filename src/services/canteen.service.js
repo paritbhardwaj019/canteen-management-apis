@@ -437,8 +437,3 @@ module.exports = {
   getCanteenReport,
 };
 
-// total monthly
-// total employees
-// total requests
-// total meals
-// total visitors
