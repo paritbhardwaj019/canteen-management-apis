@@ -1,13 +1,12 @@
 const getUserColumns = (userRole) => {
   // Base columns for all users
   const baseColumns = [
-    { field: "employeeCode", headerName: "Employee Code", width: 150 },
     { field: "plantName", headerName: "Plant", width: 150 },
     { field: "name", headerName: "Name", width: 150 },
+    { field: "email", headerName: "Employee Code", width: 150 },
+    { field: "code", headerName: "Employee Code", width: 150 },
     { field: "mobileNumber", headerName: "Mobile Number", width: 150 },
-    { field: "plainPassword", headerName: "Password", width: 150 },
-    { field: "role", headerName: "Role", width: 150 },
-    { field: "dateRegistered", headerName: "Date Registered", width: 150 },
+    { field: "roleName", headerName: "Role", width: 150 },
     { field: "createdAt", headerName: "Created At", width: 150 },
   ];
 
@@ -90,9 +89,27 @@ const getCanteenReportColumns = () => {
    
   ];
 };
+
+const getVisitorRequestColumns = () => {
+  return [
+    { field: "visitorName", headerName: "Visitor Name", width: 150 },
+    { field: "company", headerName: "Company", width: 150 },
+    { field: "contact", headerName: "Contact", width: 150 },
+    { field: "visitorEmail", headerName: "Email", width: 150 },
+    { field: "purpose", headerName: "Purpose", width: 150 },
+    { field: "visitDate", headerName: "Visit Date", width: 150 },
+    { field: "host", headerName: "Host", width: 150 },
+    { field: "status", headerName: "Status", width: 150 },
+    { field: "photo", headerName: "Photo", width: 150 },
+    { field: "visitorCount", headerName: "Visitor Count", width: 150 },
+    { field: "approvedBy", headerName: "Approved By", width: 150 },
+    { field: "createdAt", headerName: "Created At", width: 150 },
+  ];
+};
 module.exports = {
   getUserColumns,
   getMenuColumns,
   getMealRequestColumns,
   getCanteenReportColumns,
+  getVisitorRequestColumns,
 };

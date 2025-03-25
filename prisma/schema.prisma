@@ -128,6 +128,7 @@ model Plant {
   updatedById  String?
   updatedBy    User?    @relation("PlantUpdatedBy", fields: [updatedById], references: [id])
   mealRequests MealRequest[] @relation("PlantMealRequests")
+  visitorRequests VisitorRequest[] @relation("PlantVisitorRequests")
   @@map("plants")
 }
 
@@ -199,14 +200,18 @@ model VisitorRequest {
   contactNumber String?
   visitDate     DateTime
   ticketId      String         @unique
-  status        VisitorStatus  @default(PENDING)
+  status        VisitorStatus  @default(APPROVED)
+  plantId       String?
+  visitorCount  Int            @default(1)
   remarks       String?
   createdById   String
   approvedById  String?
+  photo         String? @db.Text 
   approvedAt    DateTime?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   entries       VisitorEntry[]
+  plant         Plant?         @relation("PlantVisitorRequests", fields: [plantId], references: [id])
   approvedBy    User?          @relation("VisitorRequestApprovedBy", fields: [approvedById], references: [id])
   createdBy     User           @relation("VisitorRequestCreatedBy", fields: [createdById], references: [id])
   host          User           @relation("VisitorRequestHost", fields: [hostId], references: [id])

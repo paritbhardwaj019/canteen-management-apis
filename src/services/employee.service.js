@@ -36,9 +36,15 @@ const getEmployeeColumns = (userRole) => {
     userRole === "HR"
   ) {
     baseColumns.push({
-      field: "actions",
-      headerName: "Actions",
-      width: 180,
+      field: "edit",
+      headerName: "Edit",
+      width: 80,
+      renderCell: true,
+    });
+    baseColumns.push({
+      field: "delete",
+      headerName: "Delete",
+      width: 80,
       renderCell: true,
     });
   }
@@ -57,6 +63,7 @@ const getEmployeeColumns = (userRole) => {
  * @param {String} esslOptions.photoBase64 - Base64 encoded photo for ESSL
  * @returns {Object} Newly created employee
  */
+
 const createEmployee = async (
   employeeData,
   registerInEssl = false,
@@ -938,7 +945,7 @@ const deleteEmployeePhoto = async (employeeId, photoId) => {
  * @param {Number} limit - Items per page
  * @returns {Object} Paginated list of employees and total count
  */
-const getEmployeesByDepartment = async (department, page = 1, limit = 10) => {
+const getEmployeesByDepartment = async (department, page = 1, limit = 100) => {
   const skip = (page - 1) * limit;
 
   if (!department) {
