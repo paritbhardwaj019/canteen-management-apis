@@ -50,23 +50,6 @@ const getAllUsers = async (filters = {}) => {
       roleId: true,
       createdAt: true,
       updatedAt: true,
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-      
-      plant : {
-        select: {
-          id: true,
-          name: true,
-          plantCode: true,
-        },
-      },
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
       plant : {
         select: {
           id: true,
