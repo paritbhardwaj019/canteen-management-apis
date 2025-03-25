@@ -295,7 +295,6 @@ const listVisitorRequests = async (filters = {}) => {
     whereClause.hostId = hostId;
   }
 
-  // Filter by visitorId if provided (for visitor users to see only their requests)
   if (visitorId) {
     whereClause.userId = visitorId;
   }
@@ -598,15 +597,14 @@ const getVisitorRecords = async (startDate, endDate, hostId, visitorId) => {
     data: transformedData,
   };
 };
-
 /**
  * Find visitors by search term
  * @param {string} searchTerm - Search term for finding visitors
- * @returns {Array} List of matching visitors
+ * @returns {Object} List of matching visitors and column definitions
  */
 const findVisitors = async (searchTerm) => {
   if (!searchTerm || searchTerm.length < 2) {
-    return { count: 0, items: [] };
+    return { count: 0, items: [], columns: getVisitorColumns() };
   }
 
   const visitors = await prisma.user.findMany({
@@ -621,21 +619,68 @@ const findVisitors = async (searchTerm) => {
       ],
     },
     include: {
-      visitorProfile: true,
+      visitorProfile: {
+        include: {
+          photos: {
+            take: 1,
+          },
+        },
+      },
     },
     take: 10,
   });
 
-  return {
-    count: visitors.length,
-    items: visitors.map((visitor) => ({
+  const formattedVisitors = visitors.map((visitor) => {
+    const photoUrl =
+      visitor.visitorProfile?.photos?.length > 0
+        ? visitor.visitorProfile.photos[0].url
+        : null;
+
+    return {
       id: visitor.id,
       name: `${visitor.firstName} ${visitor.lastName}`.trim(),
       email: visitor.email,
       contact: visitor.visitorProfile?.contactNumber,
       company: visitor.visitorProfile?.company,
-    })),
+      photoUrl: photoUrl,
+      createdAt: visitor.createdAt?.toISOString(),
+      status: visitor.isActive ? "Active" : "Inactive",
+    };
+  });
+
+  return {
+    count: visitors.length,
+    items: formattedVisitors,
+    columns: getVisitorColumns(),
   };
+};
+
+/**
+ * Get column definitions for visitor data table
+ * @param {String} userRole - User role to determine column visibility
+ * @returns {Array} Array of column definitions
+ */
+const getVisitorColumns = (userRole = null) => {
+  const baseColumns = [
+    { field: "photoUrl", headerName: "Photo", width: 100, renderCell: true },
+    { field: "name", headerName: "Name", width: 150 },
+    { field: "email", headerName: "Email", width: 200 },
+    { field: "contact", headerName: "Contact", width: 150 },
+    { field: "company", headerName: "Company", width: 150 },
+    { field: "status", headerName: "Status", width: 100 },
+    { field: "createdAt", headerName: "Created At", width: 150 },
+  ];
+
+  if (userRole === "Super Admin" || userRole === "HR") {
+    baseColumns.push({
+      field: "actions",
+      headerName: "Actions",
+      width: 150,
+      renderCell: true,
+    });
+  }
+
+  return baseColumns;
 };
 
 module.exports = {

@@ -4,20 +4,16 @@ const { badRequest } = require("../utils/api.error");
 const ApiResponse = require("../utils/api.response");
 
 /**
- * @module controllers/visitor-auth
- * @description Controllers for visitor authentication
- */
-
-/**
- * Register a new visitor
+ * Register a new visitor with optional photo upload
  */
 const visitorSignup = asyncHandler(async (req, res) => {
   const { email, password, firstName, lastName, contact, company } = req.body;
 
-  // Validate required fields
   if (!email || !password || !firstName || !contact) {
     throw badRequest("Missing required fields");
   }
+
+  const photoFile = req.file ? req.file.path : null;
 
   const result = await visitorAuthService.visitorSignup({
     email,
@@ -26,20 +22,21 @@ const visitorSignup = asyncHandler(async (req, res) => {
     lastName,
     contact,
     company,
+    photoUrl: photoFile,
   });
 
-  // Set HTTP-only cookie with refresh token
   res.cookie("refreshToken", result.refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
   return ApiResponse.created(res, "Visitor registered successfully", {
     visitor: result.visitor,
     profile: result.profile,
     accessToken: result.accessToken,
+    photoUrl: result.photoUrl,
   });
 });
 
@@ -49,7 +46,6 @@ const visitorSignup = asyncHandler(async (req, res) => {
 const visitorLogin = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  // Validate required fields
   if (!email || !password) {
     throw badRequest("Email and password are required");
   }
@@ -59,18 +55,18 @@ const visitorLogin = asyncHandler(async (req, res) => {
     password,
   });
 
-  // Set HTTP-only cookie with refresh token
   res.cookie("refreshToken", result.refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
   return ApiResponse.ok(res, "Login successful", {
     visitor: result.visitor,
     profile: result.profile,
     accessToken: result.accessToken,
+    photoUrl: result.photoUrl,
   });
 });
 

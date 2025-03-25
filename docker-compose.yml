@@ -1,0 +1,66 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8
+    container_name: canteen-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: canteen
+      MYSQL_USER: canteen
+      MYSQL_PASSWORD: canteenpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - canteen-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p$$MYSQL_ROOT_PASSWORD",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: canteen-api
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - API_PREFIX=/api/v1
+      - LOG_LEVEL=info
+      - DATABASE_URL=mysql://canteen:canteenpassword@mysql:3306/canteen
+      - JWT_SECRET=your-jwt-secret-key-here
+      - ACCESS_TOKEN_EXPIRES_IN=1h
+      - REFRESH_TOKEN_EXPIRES_IN=7d
+      - CORS_ORIGIN=*
+    networks:
+      - canteen-network
+
+networks:
+  canteen-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+    driver: local

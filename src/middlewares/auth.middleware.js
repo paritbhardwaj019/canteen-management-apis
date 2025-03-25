@@ -27,11 +27,36 @@ const authenticate = async (req, res, next) => {
             permissions: true,
           },
         },
+        plant: {
+          select: {
+            id: true,
+            name: true,
+            location: true,
+          },
+        },
+        headOfPlant: {
+          select: {
+            id: true,
+            name: true,
+            location: true,
+          },
+        },
       },
     });
 
     if (!user || !user.isActive) {
       throw unauthorized("User not found or inactive");
+    }
+
+    let plantId = user.plantId;
+    let plantLocation = user.plant?.location;
+
+    const isPlantHead = user.isPlantHead || user.headOfPlant !== null;
+    const plantHeadOf = user.headOfPlant ? user.headOfPlant.id : null;
+
+    if (isPlantHead && !plantId && user.headOfPlant) {
+      plantId = user.headOfPlant.id;
+      plantLocation = user.headOfPlant.location;
     }
 
     req.user = {
@@ -42,6 +67,10 @@ const authenticate = async (req, res, next) => {
       roleId: user.roleId,
       role: user.role.name,
       permissions: user.role.permissions.map((p) => p.name),
+      plantId: plantId,
+      plantLocation: plantLocation,
+      isPlantHead: isPlantHead,
+      plantHeadOf: plantHeadOf,
     };
 
     next();
@@ -77,10 +106,35 @@ const optionalAuth = async (req, res, next) => {
             permissions: true,
           },
         },
+        plant: {
+          select: {
+            id: true,
+            name: true,
+            location: true,
+          },
+        },
+        headOfPlant: {
+          select: {
+            id: true,
+            name: true,
+            location: true,
+          },
+        },
       },
     });
 
     if (user && user.isActive) {
+      let plantId = user.plantId;
+      let plantLocation = user.plant?.location;
+
+      const isPlantHead = user.isPlantHead || user.headOfPlant !== null;
+      const plantHeadOf = user.headOfPlant ? user.headOfPlant.id : null;
+
+      if (isPlantHead && !plantId && user.headOfPlant) {
+        plantId = user.headOfPlant.id;
+        plantLocation = user.headOfPlant.location;
+      }
+
       req.user = {
         id: user.id,
         email: user.email,
@@ -89,6 +143,10 @@ const optionalAuth = async (req, res, next) => {
         roleId: user.roleId,
         role: user.role.name,
         permissions: user.role.permissions.map((p) => p.name),
+        plantId: plantId,
+        plantLocation: plantLocation,
+        isPlantHead: isPlantHead,
+        plantHeadOf: plantHeadOf,
       };
     }
 

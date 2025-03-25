@@ -1,13 +1,22 @@
 const express = require("express");
 const router = express.Router();
 const visitorAuthController = require("../../controllers/visitorAuth.controller");
+const {
+  uploadVisitorPhoto,
+  handleMulterError,
+} = require("../../middlewares/upload.middleware");
 
 /**
  * @route POST /api/visitor-auth/signup
- * @desc Register a new visitor
+ * @desc Register a new visitor with optional photo upload
  * @access Public
  */
-router.post("/signup", visitorAuthController.visitorSignup);
+router.post(
+  "/signup",
+  uploadVisitorPhoto,
+  handleMulterError,
+  visitorAuthController.visitorSignup
+);
 
 /**
  * @route POST /api/visitor-auth/login

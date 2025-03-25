@@ -44,14 +44,15 @@ const createVisitorResponse = (visitor) => ({
 });
 
 /**
- * Register a new visitor user
- * @param {Object} data - Visitor signup data
+ * Register a new visitor user with optional photo
+ * @param {Object} data - Visitor signup data including photoUrl
  * @returns {Object} New visitor and access token
  */
 const visitorSignup = async (data) => {
   validateVisitorSignupRequest(data);
 
-  const { email, password, firstName, lastName, contact, company } = data;
+  const { email, password, firstName, lastName, contact, company, photoUrl } =
+    data;
 
   const existingUser = await prisma.user.findUnique({
     where: { email },
@@ -71,42 +72,60 @@ const visitorSignup = async (data) => {
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  const newVisitor = await prisma.user.create({
-    data: {
-      email,
-      password: hashedPassword,
-      firstName,
-      lastName: lastName || "",
-      roleId: visitorRole.id,
-      isActive: true,
-      visitorProfile: {
-        create: {
-          contactNumber: contact,
-          company,
+  const result = await prisma.$transaction(async (prisma) => {
+    const newVisitor = await prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        firstName,
+        lastName: lastName || "",
+        roleId: visitorRole.id,
+        isActive: true,
+        visitorProfile: {
+          create: {
+            contactNumber: contact,
+            company,
+          },
         },
       },
-    },
-    include: {
-      role: true,
-      visitorProfile: true,
-    },
+      include: {
+        role: true,
+        visitorProfile: true,
+      },
+    });
+
+    let photo = null;
+
+    // If photo was uploaded, save it
+    if (photoUrl) {
+      photo = await prisma.visitorPhoto.create({
+        data: {
+          url: photoUrl,
+          visitorId: newVisitor.visitorProfile.id,
+        },
+      });
+    }
+
+    return { visitor: newVisitor, photo };
   });
 
   // Generate access token
   const accessToken = generateAccessToken({
-    userId: newVisitor.id,
-    email: newVisitor.email,
-    role: newVisitor.role.name,
+    userId: result.visitor.id,
+    email: result.visitor.email,
+    role: result.visitor.role.name,
   });
 
   // Generate refresh token
-  const refreshTokenObj = await generateRefreshToken(newVisitor.id);
+  const refreshTokenObj = await generateRefreshToken(result.visitor.id);
 
   // Return visitor without password
-  const { password: _, ...visitorWithoutPassword } = newVisitor;
+  const { password: _, ...visitorWithoutPassword } = result.visitor;
 
   return {
     visitor: createVisitorResponse(visitorWithoutPassword),
+    profile: result.visitor.visitorProfile,
+    photoUrl: result.photo ? result.photo.url : null,
     accessToken,
     refreshToken: refreshTokenObj.token,
   };
@@ -134,7 +153,13 @@ const visitorLogin = async (data) => {
     },
     include: {
       role: true,
-      visitorProfile: true,
+      visitorProfile: {
+        include: {
+          photos: {
+            take: 1, // Get the first photo only
+          },
+        },
+      },
     },
   });
 
@@ -161,9 +186,16 @@ const visitorLogin = async (data) => {
 
   const { password: _, ...visitorWithoutPassword } = visitor;
 
+  // Get photo URL if available
+  const photoUrl =
+    visitor.visitorProfile?.photos?.length > 0
+      ? visitor.visitorProfile.photos[0].url
+      : null;
+
   return {
     visitor: createVisitorResponse(visitorWithoutPassword),
     profile: visitor.visitorProfile,
+    photoUrl,
     accessToken,
     refreshToken: refreshTokenObj.token,
     refreshTokenExpiry: refreshTokenObj.expiresAt,

@@ -101,6 +101,8 @@ module.exports = {
 
   uploadMultipleEmployeePhotos: imageUpload.array("photos", 5),
 
+  uploadVisitorPhoto: imageUpload.single("photo"),
+
   handleMulterError,
 
   deleteFile,

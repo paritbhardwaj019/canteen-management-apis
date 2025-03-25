@@ -3,6 +3,7 @@ const prisma = new PrismaClient();
 const { getDeviceLogs } = require("../services/essl.service");
 const { badRequest } = require("../utils/api.error");
 const { getCanteenReportColumns } = require("../utils/columnModles");
+
 /**
  * Parse logTime string into a valid Date object
  * @param {string} logTime - Time string from ESSL (e.g., '2025-03-2311:34:52')
@@ -36,7 +37,7 @@ const getCanteenEntryColumns = (role) => {
     { field: "status", headerName: "Status", width: 120 },
   ];
 
-  if (role !== "EMPLOYEE") {
+  if (role !== "Employee") {
     baseColumns.push({
       field: "actions",
       headerName: "Actions",
@@ -54,8 +55,6 @@ const getCanteenEntryColumns = (role) => {
  */
 const formatEntryData = (entry) => {
   const { employee, ...entryData } = entry;
-
-  console.log("EMPLOYEE PHOTOS", employee?.photos);
 
   const photoUrl =
     employee?.photos && employee.photos.length > 0
@@ -77,48 +76,41 @@ const formatEntryData = (entry) => {
 };
 
 /**
- * Get all canteen entries with optional filters
- * @param {Object} loggedInUser - Current logged in user
- * @param {Object} filters - Optional filters { date, location }
- * @returns {Promise<Object>} Object containing entries and column definitions
+ * Process device logs for a specific location
+ * @param {String} date - Date to fetch logs for (YYYY-MM-DD)
+ * @param {String} locationType - Location type from the Locations table
+ * @returns {Promise<Array>} Array of processed entries
  */
-const getAllEntries = async (loggedInUser, filters = {}) => {
-  const { role, plantId } = loggedInUser;
-  const { date, location } = filters;
-
-  if (role === "EMPLOYEE") {
-    throw badRequest("You are not authorized to access this resource");
-  }
-
+const processLocationLogs = async (date, locationType) => {
   try {
-    let entries = [];
+    console.log(`Fetching logs for location: ${locationType} on date: ${date}`);
+    const logs = await getDeviceLogs(date, locationType);
 
-    if (date && location) {
-      const logs = await getDeviceLogs(date, location);
+    if (!logs || logs.length === 0) {
+      console.log(`No logs found for location: ${locationType}`);
+      return [];
+    }
 
-      if (!logs || logs.length === 0) {
-        return {
-          entries: [],
-          columns: getCanteenEntryColumns(role),
-        };
-      }
+    console.log(`Found ${logs.length} logs for location: ${locationType}`);
 
-      const processedEntries = await Promise.all(
-        logs.map(async (log) => {
-          const employee = await prisma.employee.findFirst({
-            where: { employeeNo: log.user },
-          });
+    const processedEntries = await Promise.all(
+      logs.map(async (log) => {
+        const employee = await prisma.employee.findFirst({
+          where: { employeeNo: log.user },
+        });
 
-          if (!employee) return null;
+        if (!employee) {
+          console.log(`No employee found for code: ${log.user}`);
+          return null;
+        }
 
-          const parsedLogTime = parseLogTime(log.logTime);
-          if (!parsedLogTime) {
-            console.warn(
-              `Invalid logTime for user ${log.user}: ${log.logTime}`
-            );
-            return null;
-          }
+        const parsedLogTime = parseLogTime(log.logTime);
+        if (!parsedLogTime) {
+          console.warn(`Invalid logTime for user ${log.user}: ${log.logTime}`);
+          return null;
+        }
 
+        try {
           const entry = await prisma.canteenEntry.upsert({
             where: {
               employeeId_logTime: {
@@ -131,11 +123,8 @@ const getAllEntries = async (loggedInUser, filters = {}) => {
               employeeId: employee.id,
               status: "PENDING",
               logTime: parsedLogTime,
-              location:
-                log.location?.toString() === "NaN"
-                  ? null
-                  : log.location?.toString(),
-              plantId: log.location?.toString(),
+              location: locationType, // Use locationType as the location
+              plantId: employee.user?.plantId, // Use employee's plant if available
             },
             include: {
               employee: {
@@ -147,24 +136,160 @@ const getAllEntries = async (loggedInUser, filters = {}) => {
                       firstName: true,
                       lastName: true,
                       email: true,
+                      plantId: true,
                     },
                   },
                 },
               },
             },
           });
+          console.log(`Processed entry for employee: ${employee.employeeNo}`);
           return entry;
-        })
+        } catch (error) {
+          console.error(
+            `Error processing entry for ${employee.employeeNo}:`,
+            error
+          );
+          return null;
+        }
+      })
+    );
+
+    return processedEntries.filter((entry) => entry !== null);
+  } catch (error) {
+    console.error(`Error processing logs for location ${locationType}:`, error);
+    return [];
+  }
+};
+
+/**
+ * Get all canteen entries with optional filters and role-based access
+ * @param {Object} loggedInUser - Current logged in user with role and other info
+ * @param {Object} filters - Optional filters { date, location }
+ * @returns {Promise<Object>} Object containing entries and column definitions
+ */
+const getAllEntries = async (loggedInUser, filters = {}) => {
+  const { role, id, plantId } = loggedInUser;
+  const { date, location } = filters;
+
+  console.log("LOGGED IN USER", loggedInUser);
+
+  if (role === "Employee") {
+    throw badRequest("You are not authorized to access this resource");
+  }
+
+  try {
+    let assignedPlantLocation = null;
+
+    if (role !== "Super Admin" && plantId) {
+      const userPlant = await prisma.plant.findUnique({
+        where: { id: plantId },
+        select: { location: true },
+      });
+      assignedPlantLocation = userPlant?.location;
+    } else if (role === "Plant Head") {
+      const headedPlant = await prisma.plant.findUnique({
+        where: { plantHeadId: id },
+        select: { location: true },
+      });
+
+      console.log("headedPlant", headedPlant);
+      assignedPlantLocation = headedPlant?.location;
+    }
+
+    console.log("ASSIGNED PLANT LOCATION", assignedPlantLocation);
+
+    let entries = [];
+
+    if (date) {
+      let locationsToProcess = [];
+
+      if (role === "Super Admin") {
+        const allLocations = await prisma.locations.findMany();
+        locationsToProcess = allLocations;
+      } else if (role === "Plant Head" || role === "Caterer" || role === "HR") {
+        locationsToProcess = [{ locationType: assignedPlantLocation }];
+      } else {
+        if (!assignedPlantLocation) {
+          console.log(
+            `User ${id} with role ${role} has no assigned plant location`
+          );
+          return {
+            entries: [],
+            columns: getCanteenEntryColumns(role),
+          };
+        }
+
+        const matchingLocations = await prisma.locations.findMany({
+          where: {
+            locationType: { contains: assignedPlantLocation },
+          },
+        });
+
+        if (matchingLocations.length === 0) {
+          const fallbackLocations = await prisma.locations.findMany({
+            where: {
+              OR: [
+                { deviceName: { contains: assignedPlantLocation } },
+                {
+                  locationType: {
+                    contains: assignedPlantLocation.split(" ")[0],
+                  },
+                }, // Try with first word
+              ],
+            },
+          });
+
+          locationsToProcess = fallbackLocations;
+        } else {
+          locationsToProcess = matchingLocations;
+        }
+
+        if (location) {
+          locationsToProcess = locationsToProcess.filter((loc) =>
+            loc.locationType.toLowerCase().includes(location.toLowerCase())
+          );
+        }
+      }
+
+      console.log(
+        `Processing ${locationsToProcess.length} locations for user with role ${role}`
       );
-      console.log("PROCESSED ENTRIES");
-      entries = processedEntries.filter((entry) => entry !== null && entry.status === 'PENDING');
+
+      if (locationsToProcess.length > 0) {
+        let allProcessedEntries = [];
+
+        for (const locationData of locationsToProcess) {
+          const processedEntries = await processLocationLogs(
+            date,
+            locationData.locationType
+          );
+          allProcessedEntries = [...allProcessedEntries, ...processedEntries];
+        }
+
+        entries = allProcessedEntries.filter(
+          (entry) => entry.status === "PENDING"
+        );
+      }
     } else {
-      const whereClause = plantId ? { employee: { plantId } , status: 'PENDING'} : { status: 'PENDING'};
-      console.log("WHERE CLAUSE", whereClause);
+      const whereClause = { status: "PENDING" };
+
+      if (role !== "Super Admin" && plantId) {
+        whereClause.plantId = plantId;
+      } else if (role === "Plant Head") {
+        const headedPlant = await prisma.plant.findUnique({
+          where: { plantHeadId: id },
+          select: { id: true },
+        });
+
+        if (headedPlant) {
+          whereClause.plantId = headedPlant.id;
+        }
+      }
+
       entries = await prisma.canteenEntry.findMany({
         where: whereClause,
         include: {
-         
           employee: {
             select: {
               employeeNo: true,
@@ -174,8 +299,15 @@ const getAllEntries = async (loggedInUser, filters = {}) => {
                   firstName: true,
                   lastName: true,
                   email: true,
+                  plantId: true,
                 },
               },
+            },
+          },
+          plant: {
+            select: {
+              name: true,
+              location: true,
             },
           },
         },
@@ -232,8 +364,6 @@ const approveEntry = async (id, status) => {
     throw badRequest(`Failed to approve entry: ${error.message}`);
   }
 };
-// get entries by date, custom date and only those with status APPROVED. and plant id from the users loggedin
-// fromDate and ToDate . if only from date is provided, then get all entries from that date only. and in case of both then range data.
 
 const getCanteenReport = async (loggedInUser, filters = {}) => {
   const { fromDate, toDate } = filters;
@@ -244,7 +374,12 @@ const getCanteenReport = async (loggedInUser, filters = {}) => {
 
   const dateFilter = toDate
     ? { gte: new Date(fromDate), lte: new Date(toDate) }
-    : { gte: new Date(fromDate), lt: new Date(new Date(fromDate).setDate(new Date(fromDate).getDate() + 1)) };
+    : {
+        gte: new Date(fromDate),
+        lt: new Date(
+          new Date(fromDate).setDate(new Date(fromDate).getDate() + 1)
+        ),
+      };
 
   let entries = await prisma.canteenEntry.findMany({
     where: {
@@ -274,27 +409,26 @@ const getCanteenReport = async (loggedInUser, filters = {}) => {
     },
   });
 
-  const meals = await prisma.menu.findMany({
-  });
+  const meals = await prisma.menu.findMany({});
 
-  
   entries = entries.map((entry) => ({
     ...entry,
     plantName: entry.plant?.name || "N/A",
     plantCode: entry.plant?.plantCode || "N/A",
     date: entry.logTime.toISOString().split("T")[0],
     employeeNo: entry.employee.employeeNo,
-    employeeName: entry.employee.user.firstName + " " + entry.employee.user.lastName,
+    employeeName:
+      entry.employee.user.firstName + " " + entry.employee.user.lastName,
     logTime: entry.logTime.toISOString().split("T")[0],
     quantity: 1,
     employerContribution: meals[0].emrContribution,
     employeeContribution: meals[0].empContribution,
     price: meals[0].price,
     meal: meals[0].name,
-    mealType: meals[0].type
+    mealType: meals[0].type,
   }));
 
-  return {entries, columns: getCanteenReportColumns()};
+  return { entries, columns: getCanteenReportColumns() };
 };
 
 module.exports = {
