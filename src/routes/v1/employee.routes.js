@@ -59,6 +59,12 @@ router.get(
   employeeController.getEmployeesByDepartment
 );
 
+router.put(
+  "/disable/:id",
+  checkRole(["Super Admin", "Plant Head", "HR"]),
+  employeeController.disableEmployee
+);
+
 // router.post(
 //   "/import-from-essl",
 //   checkRole(["Super Admin"]),

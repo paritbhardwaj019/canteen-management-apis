@@ -1,6 +1,7 @@
 const getUserColumns = (userRole) => {
   // Base columns for all users
   const baseColumns = [
+    { field: "plantCode", headerName: "Plant Code", width: 150 },
     { field: "plantName", headerName: "Plant", width: 150 },
     { field: "name", headerName: "Name", width: 150 },
     { field: "email", headerName: "Employee Code", width: 150 },
