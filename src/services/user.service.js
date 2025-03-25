@@ -52,6 +52,7 @@ const getAllUsers = async (filters = {}) => {
       updatedAt: true,
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
       
       plant : {
         select: {
@@ -60,6 +61,8 @@ const getAllUsers = async (filters = {}) => {
           plantCode: true,
         },
       },
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 =======
