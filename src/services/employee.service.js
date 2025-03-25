@@ -36,9 +36,15 @@ const getEmployeeColumns = (userRole) => {
     userRole === "HR"
   ) {
     baseColumns.push({
-      field: "actions",
-      headerName: "Actions",
-      width: 180,
+      field: "edit",
+      headerName: "Edit",
+      width: 80,
+      renderCell: true,
+    });
+    baseColumns.push({
+      field: "delete",
+      headerName: "Delete",
+      width: 80,
       renderCell: true,
     });
   }
