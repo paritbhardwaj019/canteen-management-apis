@@ -1,6 +1,7 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 const bcrypt = require("bcrypt");
+const { getUserColumns } = require("../utils/columnModles");
 const { notFound, conflict, unauthorized } = require("../utils/api.error");
 
 /**
@@ -11,7 +12,14 @@ const { notFound, conflict, unauthorized } = require("../utils/api.error");
 const getAllUsers = async (filters = {}) => {
   const { roleId, isActive, search } = filters;
 
-  const where = {};
+  const where = {
+    // Exclude users with Employee or Visitor roles
+    role: {
+      name: {
+        notIn: ['Employee', 'Visitor']
+      }
+    }
+  };
 
   if (roleId) {
     where.roleId = roleId;
@@ -30,7 +38,7 @@ const getAllUsers = async (filters = {}) => {
     ];
   }
 
-  return await prisma.user.findMany({
+  const users = await prisma.user.findMany({
     where,
     select: {
       id: true,
@@ -54,6 +62,21 @@ const getAllUsers = async (filters = {}) => {
       firstName: "asc",
     },
   });
+
+  // Transform the users array to include roleName at the top level
+  const transformedUsers = users.map(user => {
+    const { role, ...rest } = user;
+    return {
+      ...rest,
+      roleName: role.name,
+      role
+    };
+  });
+
+  return {
+    users: transformedUsers, 
+    columns: getUserColumns(roleId) 
+  }
 };
 
 /**

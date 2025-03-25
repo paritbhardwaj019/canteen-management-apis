@@ -1,23 +1,52 @@
 const visitorService = require("../services/visitor.service");
 const asyncHandler = require("../utils/async.handler");
-const { badRequest } = require("../utils/api.error");
+const { badRequest, notFound } = require("../utils/api.error");
 const ApiResponse = require("../utils/api.response");
 const { v4: uuidv4 } = require("uuid");
+const { PrismaClient } = require("@prisma/client");
+
+const prisma = new PrismaClient();
 
 /**
  * Register a new visitor request
  */
 const registerVisitorRequest = asyncHandler(async (req, res) => {
-  const { purpose, company, contact, visitDate, email, firstName, lastName } =
-    req.body;
-  console.log(req.user);
+  // Debug request information
+  console.log('=== Visitor Registration Debug ===');
+  console.log('Request Files:', req.files);
+  console.log('Single File:', req.file);
+  console.log('Request Body:', req.body);
+  
+  const { purpose, company, contact, visitDate, email, firstName, lastName, visitorCount, plantId } = req.body;
+  
+  let photoBase64 = null;
+  
+  // Debug photo processing
+  if (req.file) {
+    // console.log('Photo detected:');
+    // console.log('- Filename:', req.file.originalname);
+    // console.log('- Mimetype:', req.file.mimetype);
+    // console.log('- Size:', req.file.size, 'bytes');
+    
+    try {
+      const buffer = req.file.buffer;
+      const mimeType = req.file.mimetype || 'image/jpeg';
+      photoBase64 = `data:${mimeType};base64,${buffer.toString('base64')}`;
+      
+      // Debug base64 conversion
+      // console.log('Base64 conversion successful');
+      // console.log('Base64 string length:', photoBase64.length);
+      // console.log('First 100 chars of base64:', photoBase64.substring(0, 100));
+    } catch (error) {
+      // console.error('Error converting photo to base64:', error);
+    }
+  } else {
+    // console.log('No photo file detected in request');
+  }
+
   const actualVisitorId = "vis-" + uuidv4().slice(0, 12);
-  console.log(actualVisitorId);
-  // if ((!actualVisitorId || !purpose) && req.user.role !== "Visitor") {
-  //   throw badRequest("Visitor ID and purpose are required");
-  // } else if (!purpose && req.user.role === "Visitor") {
-  //   throw badRequest("Purpose is required");
-  // }
+  // console.log('Generated Visitor ID:', actualVisitorId);
+
 
   const result = await visitorService.registerVisitorRequest(
     {
@@ -30,10 +59,24 @@ const registerVisitorRequest = asyncHandler(async (req, res) => {
       email,
       firstName,
       lastName,
+      plantId: plantId || null,
+      visitorCount: visitorCount || 1,
+      photo: photoBase64 || null
     },
-    req.user.id,
-    req.files
+    req.user.id
   );
+
+  // // Debug final result
+  // console.log('Registration result:', {
+  //   ticketId: result.ticketId,
+  //   photoSaved: !!result.visitor.photo
+  // });
+
+  if (result.visitor && result.visitor.photo) {
+    result.visitor.photoUrl = `/api/visitors/${result.ticketId}/photo`;
+    result.visitor.photoPreview = result.visitor.photo.substring(0, 100) + '...';
+    delete result.visitor.photo;
+  }
 
   return ApiResponse.created(
     res,
@@ -168,6 +211,32 @@ const findVisitors = asyncHandler(async (req, res) => {
   return ApiResponse.collection(res, "Visitors found", results);
 });
 
+/**
+ * Get visitor photo
+ */
+const getVisitorPhoto = asyncHandler(async (req, res) => {
+  const { ticketId } = req.params;
+  
+  const visitor = await prisma.visitorRequest.findUnique({
+    where: { ticketId },
+    select: { photo: true }
+  });
+
+  if (!visitor || !visitor.photo) {
+    throw notFound('Photo not found');
+  }
+
+  // The photo is stored as base64 with data URI format
+  // Extract the mime type and actual base64 data
+  const [header, base64Data] = visitor.photo.split(',');
+  const contentType = header.split(':')[1].split(';')[0];
+
+  const imageBuffer = Buffer.from(base64Data, 'base64');
+  
+  res.setHeader('Content-Type', contentType);
+  res.send(imageBuffer);
+});
+
 module.exports = {
   registerVisitorRequest,
   processVisitorRequest,
@@ -176,4 +245,5 @@ module.exports = {
   handleVisitorEntry,
   getVisitorRecords,
   findVisitors,
+  getVisitorPhoto,
 };

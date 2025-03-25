@@ -41,7 +41,7 @@ const createPlant = async (plantData, loggedInUser) => {
  */
 const getAllPlants = async (filter = {}, options = {}, loggedInUser) => {
   const page = options.page || 1;
-  const limit = options.limit || 10;
+  const limit = options.limit || 100;
   const skip = (page - 1) * limit;
 
   const where = {};
