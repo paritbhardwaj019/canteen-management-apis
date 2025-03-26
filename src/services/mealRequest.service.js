@@ -117,7 +117,7 @@ const createMealRequest = async (requestData, userId) => {
 
 const getAllMealRequests = async (filters, userId, permissions, userRole) => {
   const { status, userId: filterUserId, date, from, to } = filters;
-
+  console.log(filters);
   const where = {};
 
   const isSuperAdminOrApprover =
@@ -183,7 +183,7 @@ const getAllMealRequests = async (filters, userId, permissions, userRole) => {
     return {
       ...request,
       menuName: request.menu.name,
-    empContribution: request.menu.empContribution,
+      empContribution: request.menu.empContribution,
       emrContribution: request.menu.emrContribution,
       menuPrice: request.menu.price,
       menuType: request.menu.type,
@@ -463,7 +463,7 @@ const getMealRequestSummary = async (filters, user) => {
   
   });
 
-  const today = new Date().toUTCString().split("T")[0];
+  const today = new Date().toISOString().split("T")[0];
   const mealEntrys = await prisma.canteenEntry.count({
   });
   const tabledata =  await getAllMealRequests(
@@ -471,8 +471,8 @@ const getMealRequestSummary = async (filters, user) => {
       status: 'APPROVED',
       userId: user.id,
       date: today,
-      from: from,
-      to: to
+      from: today,
+      to: today
     },
     user.id,
     user.permissions,
