@@ -1,6 +1,7 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
-const { getMealRequestColumns } = require("../utils/columnModles");
+const { getMealRequestColumns, getDashboardColumns } = require("../utils/columnModles");
+const { convertToIST, convertToLocal, getISTDayBoundaries } = require("../utils/dateUtils");
 const { getAllEntries } = require("./canteen.service");
 const {
   notFound,
@@ -172,6 +173,7 @@ const getAllMealRequests = async (filters, userId, permissions, userRole) => {
           lastName: true,
         },
       },
+      plant: true,
       menu: true,
     },
     orderBy: {
@@ -182,9 +184,13 @@ const getAllMealRequests = async (filters, userId, permissions, userRole) => {
   const transformedData = data.map(request => {
     return {
       ...request,
+      date: convertToIST(request.date),
+      createdAt: convertToIST(request.createdAt),
       menuName: request.menu.name,
       empContribution: request.menu.empContribution,
       emrContribution: request.menu.emrContribution,
+      plantName: request.plant.name,
+      plantCode: request.plant.plantCode,
       menuPrice: request.menu.price,
       menuType: request.menu.type,
       name: request.user.firstName + " " + request.user.lastName,
@@ -201,7 +207,7 @@ const getAllMealRequests = async (filters, userId, permissions, userRole) => {
   summary.to = to;
   
   console.log(summary);
-  
+  console.log(transformedData);
   return {
     data: transformedData,
     summary,
@@ -399,43 +405,39 @@ const deleteMealRequest = async (id, userId, permissions) => {
 };
 
 const getMealRequestSummary = async (filters, user) => {
-  console.log(filters);
-  const { from, to } = filters;
+  let { from, to } = filters;
 
-  const dateFilter = {};
-  
-  // Enhanced date filtering logic
-  if (from && to) {
-    // If both from and to are provided, get records between these dates
-    dateFilter.date = {
-      gte: new Date(new Date(from).setHours(0, 0, 0, 0)),
-      lte: new Date(new Date(to).setHours(23, 59, 59, 999)),
-    };
-  } else if (from && !to) {
-    // If only from date is provided, get records for that day only
-    dateFilter.date = {
-      gte: new Date(new Date(from).setHours(0, 0, 0, 0)),
-      lt: new Date(new Date(from).setHours(23, 59, 59, 999)),
-    };
-  } else if (!from && to) {
-    // If only to date is provided, get all records up to (and including) that day
-    dateFilter.date = {
-      lte: new Date(new Date(to).setHours(23, 59, 59, 999)),
-    };
+  const fromDate = from ? new Date(from) : new Date();
+  const toDate = to ? new Date(to) : new Date();
+
+  const { start: startOfDay } = getISTDayBoundaries(fromDate);
+  const { end: endOfDay } = getISTDayBoundaries(toDate);
+
+  const whereClause = {
+    date: {
+      gte: startOfDay,
+      lte: endOfDay
+    }
+  };
+
+  // Add plantId filter if provided
+  if (filters.plantId) {
+    whereClause.plantId = filters.plantId;
   }
 
   const statusCounts = await prisma.mealRequest.groupBy({
     by: ["status"],
-    where: dateFilter,
+    where: whereClause,
     _count: {
       status: true,
     },
   });
 
   const mealRequests = await prisma.mealRequest.findMany({
-    where: dateFilter,
+    where: whereClause,
     include: {
       menu: true,
+      plant: true,
     },
   });
 
@@ -447,7 +449,7 @@ const getMealRequestSummary = async (filters, user) => {
 
   const approvedRequests = await prisma.mealRequest.findMany({
     where: {
-      ...dateFilter,
+      ...whereClause,
     },
   });
 
@@ -463,7 +465,7 @@ const getMealRequestSummary = async (filters, user) => {
   
   });
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = convertToIST(new Date()).split("T")[0];
   const mealEntrys = await prisma.canteenEntry.count({
   });
   const tabledata =  await getAllMealRequests(
@@ -478,7 +480,7 @@ const getMealRequestSummary = async (filters, user) => {
     user.permissions,
     user.role
   );
-
+  // console.log(tabledata);
   return {
     data: tabledata.data,
     columns: getMealRequestColumns('Employee'),
@@ -503,6 +505,124 @@ const getMealRequestSummary = async (filters, user) => {
   };
 };
 
+const getDashboardData = async (filters, user) => {
+  let { from, to } = filters;
+  let plantId = user.plantId || null;
+
+  // Convert dates and get IST boundaries
+  const fromDate = from ? new Date(from) : new Date();
+  const toDate = to ? new Date(to) : new Date();
+
+  const { start: startOfDay } = getISTDayBoundaries(fromDate);
+  const { end: endOfDay } = getISTDayBoundaries(toDate);
+
+  // Display IST dates for debugging
+  console.log('IST dates:', convertToLocal(fromDate), convertToLocal(toDate));
+  console.log('UTC query dates:', startOfDay.toISOString(), endOfDay.toISOString());
+
+  // Build where clause with IST boundaries
+  const whereClause = {
+    date: {
+      gte: startOfDay,
+      lte: endOfDay
+    }
+  };
+
+  // Add plantId filter if provided
+  if (plantId) {
+    whereClause.plantId = plantId;
+  }
+
+  // Fetch meal requests with necessary relations
+  const mealRequests = await prisma.mealRequest.findMany({
+    where: whereClause,
+    include: {
+      menu: true,
+      plant: true,
+    },
+  });
+
+  // Group and summarize by plant
+  const plantSummaries = mealRequests.reduce((acc, request) => {
+    const plantCode = request.plant?.plantCode;
+    
+    if (!plantCode) return acc;
+
+    if (!acc[plantCode]) {
+      // Initialize plant summary
+      acc[plantCode] = {
+        plantId: request.plantId,
+        plantName: request.plant.name,
+        plantCode: plantCode,
+        menuName: request.menu.name,
+        quantity: 0,
+        menuPrice: request.menu.price,
+        empContribution: 0,
+        emrContribution: 0,
+        totalPrice: 0,
+      };
+    }
+
+    // Accumulate values
+    acc[plantCode].quantity += request.quantity;
+    acc[plantCode].totalPrice += request.totalPrice;
+    
+    // Calculate contributions based on unit values and quantity
+    const empContPerMeal = request.menu.empContribution || 0;
+    const emrContPerMeal = request.menu.emrContribution || 0;
+    
+    acc[plantCode].empContribution += (empContPerMeal * request.quantity);
+    acc[plantCode].emrContribution += (emrContPerMeal * request.quantity);
+
+    return acc;
+  }, {});
+
+  // Convert to array and calculate final values
+  const summarizedData = Object.values(plantSummaries);
+
+  // Get other summary data with same IST boundaries
+  const statusCounts = await prisma.mealRequest.groupBy({
+    by: ["status"],
+    where: whereClause,
+    _count: {
+      status: true,
+    },
+  });
+
+  const totalEmployees = await prisma.employee.count();
+  const totalVisitors = await prisma.visitorRequest.count();
+  const mealEntrys = await prisma.canteenEntry.count();
+
+  // Use IST formatted dates for display in response
+  const istFrom = convertToLocal(fromDate);
+  const istTo = convertToLocal(toDate);
+  const dashboard_columns = getDashboardColumns();
+  const total_width = dashboard_columns.reduce((acc, item) => acc + item.width, 0);
+  return {
+    data: summarizedData,
+    columns: dashboard_columns,
+    total_width: total_width,
+    heading: {
+      totalEmployees,
+      totalRequests: mealRequests.length,
+      totalVisitors,
+      totalMeals: mealEntrys
+    },
+    summary: {
+      totalEmployees,
+      totalRequests: mealRequests.length,
+      totalVisitors,
+      totalWidth: total_width,
+      totalMeals: mealEntrys,
+      from: istFrom || null,
+      to: istTo || null
+    },
+    byStatus: statusCounts.reduce((acc, item) => {
+      acc[item.status.toLowerCase()] = item._count.status;
+      return acc;
+    }, {}),
+  };
+};
 
 // 
 module.exports = {
@@ -513,4 +633,5 @@ module.exports = {
   cancelMealRequest,
   deleteMealRequest,
   getMealRequestSummary,
+  getDashboardData,
 };

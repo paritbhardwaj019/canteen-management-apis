@@ -155,6 +155,18 @@ const getMealRequestSummary = asyncHandler(async (req, res) => {
   );
 });
 
+const getDashboardData = asyncHandler(async (req, res) => {
+
+  const dashboardData = await mealRequestService.getDashboardData({
+  }, req.user);
+
+  return ApiResponse.ok(
+    res,
+    "Dashboard data retrieved successfully",
+    dashboardData
+  );
+});
+
 module.exports = {
   createMealRequest,
   getAllMealRequests,
@@ -163,4 +175,5 @@ module.exports = {
   cancelMealRequest,
   deleteMealRequest,
   getMealRequestSummary,
+  getDashboardData,
 };

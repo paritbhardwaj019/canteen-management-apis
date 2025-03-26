@@ -13,6 +13,7 @@ router.get(
   checkPermissions(["view_reports"]),
   mealRequestController.getMealRequestSummary
 );
+router.get("/dashboard", mealRequestController.getDashboardData); 
 router.get("/:id", mealRequestController.getMealRequestById);
 router.put("/:id", mealRequestController.updateMealRequest);
 router.patch("/:id/cancel", mealRequestController.cancelMealRequest);

@@ -1,5 +1,6 @@
 const { PrismaClient } = require("@prisma/client");
 const { getVisitorRequestColumns } = require("../utils/columnModles");
+const { convertToIST } = require("../utils/dateUtils");
 const prisma = new PrismaClient();
 const { v4: uuidv4 } = require("uuid");
 const {
@@ -401,7 +402,7 @@ const listVisitorRequests = async (filters = {}) => {
       createdAt: "desc",
     },
   });
-
+console.log(visitorRequests);
     return {
     columns:getVisitorRequestColumns(),
     count: visitorRequests.length,
@@ -412,10 +413,11 @@ const listVisitorRequests = async (filters = {}) => {
         visitorName: request.visitorName,
       visitorEmail: request.user.email,
       visitorName: request.visitorName,
+      visitorCount: request.visitorCount,
       contact: request.contactNumber,
       company: request.company,
       purpose: request.purpose,
-      visitDate: request.visitDate.toISOString().split('T')[0],
+      visitDate: convertToIST(request.visitDate),
 
       host: `${request.host.firstName} ${request.host.lastName}`.trim(),
       department: request.host.department,
@@ -428,7 +430,7 @@ const listVisitorRequests = async (filters = {}) => {
         request.entries.length > 0 &&
         request.entries[0].entryTime &&
         !request.entries[0].exitTime,
-      createdAt: request.createdAt,
+      createdAt: convertToIST(request.createdAt),
       // plantId: request.plantId,
       plantName: request.plant?.name || 'N/A',
       plantCode: request.plant?.plantCode || 'N/A',
@@ -619,6 +621,7 @@ const getVisitorRecords = async (startDate, endDate, hostId, visitorId) => {
     { id: "entryTime", label: "Entry Time" },
     { id: "exitTime", label: "Exit Time" },
     { id: "duration", label: "Duration" },
+    { id: "visitorCount", label: "Visitor Count" },
   ];
 
   const transformedData = records.map((record) => {
@@ -626,7 +629,7 @@ const getVisitorRecords = async (startDate, endDate, hostId, visitorId) => {
       record.exitTime && record.entryTime
         ? Math.round((record.exitTime - record.entryTime) / (1000 * 60))
         : null;
-
+    console.log(record.visitorRequest);
     return {
       id: record.id,
       ticketId: record.visitorRequest.ticketId,
@@ -641,11 +644,12 @@ const getVisitorRecords = async (startDate, endDate, hostId, visitorId) => {
       exitTime: record.exitTime,
       duration: duration ? `${duration} min` : "Ongoing",
       entryDate: record.entryDate,
+      visitorCount: record.visitorRequest.visitorCount,
     };
   });
 
   return {
-    headers,
+    columns: headers,
     data: transformedData,
   };
 };
@@ -695,7 +699,7 @@ const findVisitors = async (searchTerm) => {
       contact: visitor.visitorProfile?.contactNumber,
       company: visitor.visitorProfile?.company,
       photoUrl: photoUrl,
-      createdAt: visitor.createdAt?.toISOString(),
+      createdAt: convertToIST(visitor.createdAt),
       status: visitor.isActive ? "Active" : "Inactive",
     };
   });
@@ -714,13 +718,13 @@ const findVisitors = async (searchTerm) => {
  */
 const getVisitorColumns = (userRole = null) => {
   const baseColumns = [
-    { field: "photoUrl", headerName: "Photo", width: 100, renderCell: true },
     { field: "name", headerName: "Name", width: 150 },
     { field: "email", headerName: "Email", width: 200 },
     { field: "contact", headerName: "Contact", width: 150 },
     { field: "company", headerName: "Company", width: 150 },
     { field: "status", headerName: "Status", width: 100 },
     { field: "createdAt", headerName: "Created At", width: 150 },
+    visitorCount
   ];
 
   if (userRole === "Super Admin" || userRole === "HR") {

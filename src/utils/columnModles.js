@@ -24,7 +24,7 @@ const getUserColumns = (userRole) => {
 
 const getMenuColumns = (userRole) => {
   const baseColumns = [
-    { field: "type", headerName: "Type", width: 150 },
+    { field: "name", headerName: "Name", width: 150 },
     { field: "price", headerName: "Price", width: 150 },
     {
       field: "empContribution",
@@ -49,17 +49,16 @@ const getMenuColumns = (userRole) => {
 
 const getMealRequestColumns = (userRole) => {
   const baseColumns = [
-    { field: "date", headerName: "Date", width: 150 },
     { field: "plantName", headerName: "Plant", width: 150 },
     { field: "plantCode", headerName: "Plant Code", width: 150 },
-    { field: "quantity", headerName: "Quantity", width: 150 },
+    { field: "quantity", headerName: "Quantity", width: 100 },
     { field: "totalPrice", headerName: "Total Price", width: 150 },
     { field: "name", headerName: "Employee Name", width: 150 }, 
-    { field: "mealName", headerName: "Meal Name", width: 150 },
+    { field: "menuName", headerName: "Meal Name", width: 150 },
     {
       field: "empContribution",
       headerName: "Employee Contribution",
-      width: 150,
+      width: 200,
     },
     {
       field: "emrContribution",
@@ -100,15 +99,25 @@ const getVisitorRequestColumns = () => {
     { field: "visitorName", headerName: "Visitor Name", width: 150 },
     { field: "company", headerName: "Company", width: 150 },
     { field: "contact", headerName: "Contact", width: 150 },
+    { field: "visitorCount", headerName: "Visitor Count", width: 150 },
     { field: "visitorEmail", headerName: "Email", width: 150 },
     { field: "purpose", headerName: "Purpose", width: 150 },
   
     { field: "host", headerName: "Host", width: 150 },
-    { field: "status", headerName: "Status", width: 150 },
     { field: "photo", headerName: "Photo", width: 150 },
-    { field: "visitorCount", headerName: "Visitor Count", width: 150 },
-    { field: "approvedBy", headerName: "Approved By", width: 150 },
     { field: "createdAt", headerName: "Created At", width: 150 },
+  ];
+};
+
+const getDashboardColumns = () => {
+  return [
+    { field: "plantName", headerName: "Plant", width: 300 },
+    { field: "plantCode", headerName: "Plant Code", width: 300 },
+    { field: "menuName", headerName: "Meal Name", width: 300 },
+    { field: "quantity", headerName: "Quantity", width: 300 },
+    { field: "totalPrice", headerName: "Total Price", width: 300 },
+    { field: "empContribution", headerName: "Employee Contribution", width: 300 },
+    { field: "emrContribution", headerName: "Employee Contribution", width: 300 },
   ];
 };
 module.exports = {
@@ -117,4 +126,5 @@ module.exports = {
   getMealRequestColumns,
   getCanteenReportColumns,
   getVisitorRequestColumns,
+  getDashboardColumns,
 };
