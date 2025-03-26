@@ -223,8 +223,8 @@ const updateEmployee = async (employeeData) => {
  */
 const updateEmployeePhoto = async (photoData) => {
   try {
-    const { employeeCode, employeePhoto } = photoData;
-
+    const { employeeCode, employeePhoto, deviceSerialNumber } = photoData;
+    // console.log("photoData", photoData);
     if (!employeeCode) {
       throw badRequest("Employee code is required");
     }
@@ -233,6 +233,10 @@ const updateEmployeePhoto = async (photoData) => {
       throw badRequest("Employee photo (base64) is required");
     }
 
+    // if (!deviceSerialNumber) {
+    //   throw badRequest("Device serial number is required");
+    // }
+    console.log("deviceSerialNumber", employeeCode, employeePhoto, config.essl.username, config.essl.password);
     const soapBody = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
@@ -255,12 +259,20 @@ const updateEmployeePhoto = async (photoData) => {
       data: soapBody,
     });
 
+
     const parser = new xml2js.Parser({ explicitArray: false });
     const result = await parser.parseStringPromise(response.data);
 
     const updateResult =
       result["soap:Envelope"]["soap:Body"].UpdateEmployeePhotoResponse
         .UpdateEmployeePhotoResult;
+    console.log("updateResult", updateResult);
+    // If photo update was successful, reset the opstamp
+    if (updateResult && updateResult.includes("success")) {
+      console.log("Photo update successful, resetting opstamp...");
+      const resetResult = await resetOpstamp("TFEE240900455");
+      console.log("Opstamp reset result:", resetResult);
+    }
 
     return updateResult;
   } catch (error) {
@@ -346,11 +358,60 @@ const updateLocation = async (id, locationData) => {
   }
 };
 
+// Add this new function
+const resetOpstamp = async (deviceSerialNumber) => {
+  console.log("resetOpstamp", deviceSerialNumber);
+  try {
+    if (!deviceSerialNumber) {
+      throw badRequest("Device serial number is required");
+    }
+
+    const soapBody = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <DeviceCommand_ResetOPStamp xmlns="http://tempuri.org/">
+      <UserName>${config.essl.username}</UserName>
+      <Password>${config.essl.password}</Password>
+      <DeviceSerialNumber>${deviceSerialNumber}</DeviceSerialNumber>
+    </DeviceCommand_ResetOPStamp>
+  </soap:Body>
+</soap:Envelope>`;
+
+    const response = await axios({
+      method: "post",
+      url: `${config.essl.bioServerUrl}/iclock/webservice.asmx?op=DeviceCommand_ResetOPStamp`,
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        SOAPAction: "http://tempuri.org/DeviceCommand_ResetOPStamp",
+      },
+      data: soapBody,
+    });
+
+    const parser = new xml2js.Parser({ explicitArray: false });
+    const result = await parser.parseStringPromise(response.data);
+
+    const resetResult =
+      result["soap:Envelope"]["soap:Body"].DeviceCommand_ResetOPStampResponse
+        .DeviceCommand_ResetOPStampResult;
+
+    return resetResult;
+  } catch (error) {
+    console.error("Error resetting opstamp:", error);
+    if (error.response) {
+      throw badRequest(
+        `ESSL API Error: ${error.response.data || error.message}`
+      );
+    }
+    throw serverError(`Error connecting to ESSL server: ${error.message}`);
+  }
+};
+
 const esslService = {
   getAllDevices,
   getDeviceLogs,
   updateEmployee,
   updateEmployeePhoto,
+  resetOpstamp,
   addNewLocation,
   getAllLocations,
   deleteLocation,
