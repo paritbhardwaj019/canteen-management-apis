@@ -299,7 +299,7 @@ const getAllEmployees = async (options) => {
   // Count total employees matching criteria
   const totalCount = await prisma.employee.count({ where });
   // where.isActive = true;
-  where.user = { isActive: false };
+  where.user = { isActive: true };
 
   // Get employees with pagination
   const employees = await prisma.employee.findMany({
