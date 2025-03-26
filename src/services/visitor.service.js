@@ -411,6 +411,7 @@ const listVisitorRequests = async (filters = {}) => {
         status: request.status,
         visitorName: request.visitorName,
       visitorEmail: request.user.email,
+      visitorName: request.visitorName,
       contact: request.contactNumber,
       company: request.company,
       purpose: request.purpose,
