@@ -112,6 +112,11 @@ router.get(
   checkPermissions(["view_reports"]),
   visitorController.getVisitorRecords
 );
+router.get(
+  "/requests",
+  checkPermissions(["view_reports"]),
+  visitorController.getVisitorRecords
+);
 
 // Error handling middleware
 router.use((error, req, res, next) => {

@@ -16,7 +16,7 @@ const registerEmployee = asyncHandler(async (req, res) => {
     department,
     designation,
     password,
-    registerInEssl,
+    registerInEssl = true,
     esslLocation,
     esslRole,
     esslVerificationType,
@@ -29,14 +29,13 @@ const registerEmployee = asyncHandler(async (req, res) => {
   }
 
   const actualPassword = password || Math.random().toString(36).slice(-8);
-
   let photoUrl = null;
   let photoBase64 = null;
 
   if (req.file) {
     photoUrl = req.file.path;
 
-    if (registerInEssl) {
+    if (registerInEssl || true) {
       try {
         const axios = require("axios");
         const response = await axios.get(photoUrl, {
@@ -44,7 +43,7 @@ const registerEmployee = asyncHandler(async (req, res) => {
         });
         const buffer = Buffer.from(response.data, "binary");
         const mimeType = req.file.mimetype || "image/jpeg";
-        photoBase64 = `data:${mimeType};base64,${buffer.toString("base64")}`;
+        photoBase64 = `${buffer.toString("base64")}`;
       } catch (error) {
         console.error("Error converting Cloudinary image to base64:", error);
       }
@@ -59,6 +58,8 @@ const registerEmployee = asyncHandler(async (req, res) => {
         photoBase64,
       }
     : {};
+    console.log("esslOptions", esslOptions);
+    console.log("photoBase64", photoBase64);
 
   const newEmployee = await employeeService.createEmployee(
     {
@@ -88,6 +89,7 @@ const registerEmployee = asyncHandler(async (req, res) => {
         }
       : null,
   });
+  return ApiResponse.ok(res, "Employee registered successfully", {});
 });
 
 /**
@@ -113,7 +115,8 @@ const uploadEmployeePhoto = asyncHandler(async (req, res) => {
     try {
       esslResult = await employeeService.updateEmployeePhotoInEssl(
         id,
-        photoBase64
+        photoBase64,
+        "TFEE240900455"
       );
     } catch (error) {
       console.error("ESSL photo update failed:", error);
@@ -263,7 +266,8 @@ const updateEmployeePhotoInEssl = asyncHandler(async (req, res) => {
 
   const result = await employeeService.updateEmployeePhotoInEssl(
     id,
-    photoBase64
+    photoBase64,
+    "TFEE240900455"
   );
 
   return ApiResponse.ok(res, result.message, result);

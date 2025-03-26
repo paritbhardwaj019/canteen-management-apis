@@ -86,6 +86,7 @@ const createEmployee = async (
     verificationType = "Finger or Face or Card or Password",
     photoBase64,
   } = esslOptions;
+  console.log("esslOptions", esslOptions);
 
   // Check if employee with the same employee number already exists
   const existingEmployee = await prisma.employee.findUnique({
@@ -181,7 +182,8 @@ const createEmployee = async (
 
       let registrationSuccess =
         esslRegistrationResult && esslRegistrationResult.includes("success");
-
+      console.log("esslRegistrationResult", esslRegistrationResult);
+      console.log("photoBase64", photoBase64);
       if (registrationSuccess && photoBase64) {
         try {
           esslPhotoResult = await esslService.updateEmployeePhoto({
@@ -791,7 +793,7 @@ const registerEmployeeInEssl = async (id, esslOptions = {}) => {
  * @param {String} photoBase64 - Base64 encoded photo data
  * @returns {Object} Result of the operation
  */
-const updateEmployeePhotoInEssl = async (id, photoBase64) => {
+const updateEmployeePhotoInEssl = async (id, photoBase64, deviceSerialNumber) => {
   const employee = await prisma.employee.findUnique({
     where: { id },
     include: {
@@ -829,6 +831,7 @@ const updateEmployeePhotoInEssl = async (id, photoBase64) => {
     const result = await esslService.updateEmployeePhoto({
       employeeCode: employee.employeeNo,
       employeePhoto: photoBase64,
+      deviceSerialNumber: "TFEE240900455",
     });
 
     return {
