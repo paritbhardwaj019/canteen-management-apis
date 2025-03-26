@@ -66,6 +66,7 @@ const registerVisitorRequest = async (visitorData, userId) => {
     contactNumber: visitorData.contact,
     visitDate,
     ticketId,
+    visitorName: visitorData.firstName + " " + visitorData.lastName,
     plantId: visitorData.plantId,
     status: "APPROVED",
     createdById: visitorData.hostId,
@@ -407,13 +408,14 @@ const listVisitorRequests = async (filters = {}) => {
     items: visitorRequests.map((request) => ({
       id: request.id,
       ticketId: request.ticketId,
-      status: request.status,
-      visitorName: `${request.user.firstName} ${request.user.lastName}`.trim(),
+        status: request.status,
+        visitorName: request.visitorName,
       visitorEmail: request.user.email,
       contact: request.contactNumber,
       company: request.company,
       purpose: request.purpose,
-      visitDate: request.visitDate,
+      visitDate: request.visitDate.toISOString().split('T')[0],
+
       host: `${request.host.firstName} ${request.host.lastName}`.trim(),
       department: request.host.department,
       approvedBy: request.approvedBy

@@ -178,6 +178,10 @@ const initializeDatabase = async () => {
             "view_logs",
             "view_reports",
             "view_all_requests",
+            "manage_meals",
+            "manage_requests",
+            "approve_meal_requests",
+      
             "register_visitor",
             "view_visitors",
             "view_visitor_records",
@@ -192,6 +196,14 @@ const initializeDatabase = async () => {
             "view_reports",
             "approve_meal_requests",
             "view_all_requests",
+            "manage_meals",
+            "manage_requests",
+            "view_all_requests",
+            "view_plants",
+            "view_visitor_records",
+            "view_visitors",
+            "register_visitor",
+            "process_visitor",
           ].includes(p.name)
         )
         .map((p) => ({ id: p.id })),
