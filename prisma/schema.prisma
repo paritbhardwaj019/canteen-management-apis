@@ -11,10 +11,10 @@ model RefreshToken {
   id        String   @id @default(uuid())
   token     String   @unique
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
   revoked   Boolean  @default(false)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("refresh_tokens")
@@ -23,7 +23,6 @@ model RefreshToken {
 model User {
   id               String           @id @default(uuid())
   email            String           @unique
-  code             String?          @unique
   password         String
   firstName        String
   lastName         String
@@ -34,10 +33,14 @@ model User {
   updatedAt        DateTime         @updatedAt
   isPlantHead      Boolean          @default(false)
   plantId          String?
+  code             String?          @unique
+  employee         Employee?
   approvedRequests MealRequest[]    @relation("ApproverRequests")
   rejectedRequests MealRequest[]    @relation("RejectorRequests")
   mealRequests     MealRequest[]    @relation("EmployeeRequests")
+  createdPlants    Plant[]          @relation("PlantCreatedBy")
   headOfPlant      Plant?           @relation("PlantHeadRelation")
+  updatedPlants    Plant[]          @relation("PlantUpdatedBy")
   refreshTokens    RefreshToken[]
   plant            Plant?           @relation("UserPlantRelation", fields: [plantId], references: [id])
   role             Role             @relation(fields: [roleId], references: [id])
@@ -46,9 +49,6 @@ model User {
   createdVisitors  VisitorRequest[] @relation("VisitorRequestCreatedBy")
   hostedVisitors   VisitorRequest[] @relation("VisitorRequestHost")
   visitorRequests  VisitorRequest[] @relation("VisitorRequestUser")
-  createdPlants    Plant[]          @relation("PlantCreatedBy")
-  updatedPlants    Plant[]          @relation("PlantUpdatedBy")
-  employee         Employee?
 
   @@index([roleId], map: "users_roleId_fkey")
   @@index([plantId], map: "users_plantId_fkey")
@@ -56,30 +56,30 @@ model User {
 }
 
 model Employee {
-  id          String          @id @default(uuid())
-  userId      String          @unique
-  employeeNo  String          @unique
-  email       String?
-  department  String?
-  designation String?
-  isEsslRegistered Boolean    @default(false)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  photos      EmployeePhoto[]
-  mealRequests MealRequest[]  @relation("EmployeeMealRequests")
-  canteenEntries CanteenEntry[]
+  id               String          @id @default(uuid())
+  userId           String          @unique
+  employeeNo       String          @unique
+  email            String?
+  department       String?
+  designation      String?
+  isEsslRegistered Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  canteenEntries   CanteenEntry[]
+  photos           EmployeePhoto[]
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealRequests     MealRequest[]   @relation("EmployeeMealRequests")
 
   @@map("employees")
 }
 
 model EmployeePhoto {
-  id          String   @id @default(uuid())
-  url         String
-  employeeId  String
-  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(uuid())
+  url        String
+  employeeId String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([employeeId], map: "employee_photos_employeeId_fkey")
   @@map("employee_photos")
@@ -110,25 +110,27 @@ model Permission {
 }
 
 model Plant {
-  id           String   @id @default(uuid())
-  name         String
-  plantCode    String   @unique
-  location     String?
-  serialNumber String?
-  deviceName   String?
-  plantHeadId  String?  @unique
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  plantHead    User?    @relation("PlantHeadRelation", fields: [plantHeadId], references: [id])
-  users        User[]   @relation("UserPlantRelation")
-  canteenEntries CanteenEntry[] @relation("PlantCanteenEntries")
-  createdById  String?
-  createdBy    User?    @relation("PlantCreatedBy", fields: [createdById], references: [id])
-  updatedById  String?
-  updatedBy    User?    @relation("PlantUpdatedBy", fields: [updatedById], references: [id])
-  mealRequests MealRequest[] @relation("PlantMealRequests")
+  id              String           @id @default(uuid())
+  name            String
+  plantCode       String           @unique
+  location        String?
+  serialNumber    String?
+  deviceName      String?
+  plantHeadId     String?          @unique
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  createdById     String?
+  updatedById     String?
+  canteenEntries  CanteenEntry[]   @relation("PlantCanteenEntries")
+  mealRequests    MealRequest[]    @relation("PlantMealRequests")
+  createdBy       User?            @relation("PlantCreatedBy", fields: [createdById], references: [id])
+  plantHead       User?            @relation("PlantHeadRelation", fields: [plantHeadId], references: [id])
+  updatedBy       User?            @relation("PlantUpdatedBy", fields: [updatedById], references: [id])
+  users           User[]           @relation("UserPlantRelation")
   visitorRequests VisitorRequest[] @relation("PlantVisitorRequests")
+
+  @@index([createdById], map: "plants_createdById_fkey")
+  @@index([updatedById], map: "plants_updatedById_fkey")
   @@map("plants")
 }
 
@@ -148,13 +150,11 @@ model Menu {
 model MealRequest {
   id          String        @id @default(uuid())
   userId      String
-  employeeId  String?     
   date        DateTime
   quantity    Int           @default(1)
   totalPrice  Float?
   notes       String?
   status      RequestStatus @default(PENDING)
-  plantId     String?
   approvedBy  String?
   approvedAt  DateTime?
   rejectedBy  String?
@@ -164,28 +164,31 @@ model MealRequest {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   menuId      String
+  employeeId  String?
+  plantId     String?
   approver    User?         @relation("ApproverRequests", fields: [approvedBy], references: [id])
+  employee    Employee?     @relation("EmployeeMealRequests", fields: [employeeId], references: [id])
   menu        Menu          @relation(fields: [menuId], references: [id])
+  plant       Plant?        @relation("PlantMealRequests", fields: [plantId], references: [id])
   rejector    User?         @relation("RejectorRequests", fields: [rejectedBy], references: [id])
   user        User          @relation("EmployeeRequests", fields: [userId], references: [id])
-  employee    Employee?     @relation("EmployeeMealRequests", fields: [employeeId], references: [id])
-  plant       Plant?        @relation("PlantMealRequests", fields: [plantId], references: [id])
 
   @@index([approvedBy], map: "meal_requests_approvedBy_fkey")
   @@index([menuId], map: "meal_requests_menuId_fkey")
   @@index([rejectedBy], map: "meal_requests_rejectedBy_fkey")
   @@index([userId], map: "meal_requests_userId_fkey")
-  @@index([employeeId])   
+  @@index([employeeId])
+  @@index([plantId], map: "meal_requests_plantId_fkey")
   @@map("meal_requests")
 }
 
 model VisitorPhoto {
-  id          String   @id @default(uuid())
-  url         String
-  visitorId   String
-  visitor     VisitorProfile @relation(fields: [visitorId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String         @id @default(uuid())
+  url       String
+  visitorId String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  visitor   VisitorProfile @relation(fields: [visitorId], references: [id], onDelete: Cascade)
 
   @@index([visitorId], map: "visitor_photos_visitorId_fkey")
   @@map("visitor_photos")
@@ -198,8 +201,8 @@ model VisitorProfile {
   company       String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   photos        VisitorPhoto[]
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("visitor_profiles")
 }
@@ -214,26 +217,28 @@ model VisitorRequest {
   visitDate     DateTime
   ticketId      String         @unique
   status        VisitorStatus  @default(APPROVED)
-  plantId       String?
-  visitorCount  Int            @default(1)
   remarks       String?
   createdById   String
   approvedById  String?
-  photo         String? @db.Text 
   approvedAt    DateTime?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+  plantId       String?
+  visitorCount  Int            @default(1)
+  photo         String?        @db.Text
+  visitorName   String
   entries       VisitorEntry[]
-  plant         Plant?         @relation("PlantVisitorRequests", fields: [plantId], references: [id])
   approvedBy    User?          @relation("VisitorRequestApprovedBy", fields: [approvedById], references: [id])
   createdBy     User           @relation("VisitorRequestCreatedBy", fields: [createdById], references: [id])
   host          User           @relation("VisitorRequestHost", fields: [hostId], references: [id])
+  plant         Plant?         @relation("PlantVisitorRequests", fields: [plantId], references: [id])
   user          User           @relation("VisitorRequestUser", fields: [userId], references: [id])
 
   @@index([approvedById], map: "visitor_requests_approvedById_fkey")
   @@index([createdById], map: "visitor_requests_createdById_fkey")
   @@index([hostId], map: "visitor_requests_hostId_fkey")
   @@index([userId], map: "visitor_requests_userId_fkey")
+  @@index([plantId], map: "visitor_requests_plantId_fkey")
   @@map("visitor_requests")
 }
 
@@ -252,29 +257,32 @@ model VisitorEntry {
 }
 
 model CanteenEntry {
-  id          String   @id @default(uuid())
+  id          String             @id @default(uuid())
   employeeId  String
   status      CanteenEntryStatus @default(PENDING)
   approveTime DateTime?
   logTime     DateTime
   location    String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
   plantId     String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  plant       Plant?   @relation("PlantCanteenEntries", fields: [plantId], references: [id]) 
+  employee    Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  plant       Plant?             @relation("PlantCanteenEntries", fields: [plantId], references: [id])
+
+  @@unique([employeeId, logTime])
   @@index([employeeId])
-  @@unique([employeeId, logTime]) 
+  @@index([plantId], map: "canteen_entries_plantId_fkey")
   @@map("canteen_entries")
 }
 
-model Locations{ 
-  id String @id @default(uuid())
-  deviceName String
+model Locations {
+  id           String   @id @default(uuid())
+  deviceName   String
   serialNumber String
   locationType String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
   @@map("locations")
 }
 
@@ -282,6 +290,7 @@ enum CanteenEntryStatus {
   PENDING
   APPROVED
 }
+
 enum VisitorStatus {
   PENDING
   APPROVED
