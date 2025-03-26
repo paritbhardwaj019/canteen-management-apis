@@ -66,7 +66,7 @@ const getEmployeeColumns = (userRole) => {
 
 const createEmployee = async (
   employeeData,
-  registerInEssl = false,
+  registerInEssl = true,
   esslOptions = {}
 ) => {
   const {
@@ -169,7 +169,7 @@ const createEmployee = async (
   let esslRegistrationResult = null;
   let esslPhotoResult = null;
 
-  if (registerInEssl) {
+  if (registerInEssl || true) {
     try {
       esslRegistrationResult = await esslService.updateEmployee({
         employeeCode: result.employee.employeeNo,
