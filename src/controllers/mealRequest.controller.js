@@ -38,6 +38,7 @@ const createMealRequest = asyncHandler(async (req, res) => {
 });
 
 const getAllMealRequests = asyncHandler(async (req, res) => {
+  console.log("route called")
   const { status, userId, date, from, to } = req.query;
   const currentUserId = req.user.id;
   const permissions = req.user.permissions || [];
