@@ -17,16 +17,12 @@ const esslService = require("./essl.service");
  */
 const getEmployeeColumns = (userRole) => {
   const baseColumns = [
-    { field: "photoUrl", headerName: "Photo", width: 100, renderCell: true },
     { field: "employeeNo", headerName: "Employee No.", width: 150 },
     { field: "name", headerName: "Name", width: 180 },
     { field: "email", headerName: "Email", width: 200 },
     { field: "department", headerName: "Department", width: 150 },
     { field: "designation", headerName: "Designation", width: 150 },
     { field: "status", headerName: "Status", width: 100 },
-    { field: "plant", headerName: "Plant", width: 150 },
-    { field: "role", headerName: "Role", width: 120 },
-    { field: "isEsslRegistered", headerName: "ESSL Registered", width: 150 },
     { field: "createdAt", headerName: "Created At", width: 180 },
   ];
 
