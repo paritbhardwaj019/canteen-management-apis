@@ -542,45 +542,150 @@ const getDashboardData = async (filters, user) => {
     },
   });
 
-  // Group and summarize by plant
-  const plantSummaries = mealRequests.reduce((acc, request) => {
-    const plantCode = request.plant?.plantCode;
+  // Get counts for each plant separately
+  const getPlantSpecificCounts = async () => {
+    // Get unique plant IDs from the meal requests
+    const plantIds = [...new Set(
+      mealRequests
+        .filter(req => req.plantId !== null)
+        .map(req => req.plantId)
+    )];
     
-    if (!plantCode) return acc;
-
-    if (!acc[plantCode]) {
-      // Initialize plant summary
-      acc[plantCode] = {
-        plantId: request.plantId,
-        plantName: request.plant.name,
-        plantCode: plantCode,
-        menuName: request.menu.name,
-        quantity: 0,
-        menuPrice: request.menu.price,
-        empContribution: 0,
-        emrContribution: 0,
-        totalPrice: 0,
+    const plantCountsMap = {};
+    
+    // For each plant, get specific counts
+    for (const plantId of plantIds) {
+      const visitorCount = await prisma.visitorRequest.count({
+        where: {
+          plantId,
+          visitDate: {
+            gte: startOfDay,
+            lte: endOfDay
+          }
+        }
+      });
+      
+      const mealRequestCount = await prisma.mealRequest.count({
+        where: {
+          plantId,
+          date: {
+            gte: startOfDay,
+            lte: endOfDay
+          }
+        }
+      });
+      
+      const canteenEntryCount = await prisma.canteenEntry.count({
+        where: {
+          plantId,
+          logTime: {
+            gte: startOfDay,
+            lte: endOfDay
+          }
+        }
+      });
+      
+      plantCountsMap[plantId] = {
+        visitorCount,
+        mealRequestCount,
+        canteenEntryCount
       };
     }
-
-    // Accumulate values
-    acc[plantCode].quantity += request.quantity;
-    acc[plantCode].totalPrice += request.totalPrice;
     
-    // Calculate contributions based on unit values and quantity
-    const empContPerMeal = request.menu.empContribution || 0;
-    const emrContPerMeal = request.menu.emrContribution || 0;
-    
-    acc[plantCode].empContribution += (empContPerMeal * request.quantity);
-    acc[plantCode].emrContribution += (emrContPerMeal * request.quantity);
+    return plantCountsMap;
+  };
 
+  // Get the plant-specific counts
+  const plantCountsMap = await getPlantSpecificCounts();
+
+  // First, group meal requests by plant
+  const plantGroups = mealRequests.reduce((acc, request) => {
+    const plantId = request.plantId;
+    const plantCode = request.plant?.plantCode;
+    
+    if (!plantId || !plantCode) return acc;
+    
+    if (!acc[plantCode]) {
+      acc[plantCode] = {
+        requests: [],
+        plantId,
+        plantName: request.plant.name,
+        plantCode
+      };
+    }
+    
+    acc[plantCode].requests.push(request);
     return acc;
   }, {});
 
-  // Convert to array and calculate final values
-  const summarizedData = Object.values(plantSummaries);
+  // Now summarize each plant group
+  const plantSummaries = Object.values(plantGroups).map(group => {
+    const { plantId, plantName, plantCode, requests } = group;
+    
+    // Example menu details from the first request (assuming same menu per plant)
+    const sampleRequest = requests[0];
+    
+    // Get plant-specific counts
+    const counts = plantCountsMap[plantId] || {
+      visitorCount: 0,
+      mealRequestCount: 0,
+      canteenEntryCount: 0
+    };
+    
+    // Calculate aggregates
+    let totalQuantity = 0;
+    let totalPrice = 0;
+    let totalEmpContribution = 0;
+    let totalEmrContribution = 0;
+    
+    requests.forEach(request => {
+      totalQuantity += request.quantity;
+      totalPrice += request.totalPrice || 0;
+      
+      const empContPerMeal = request.menu.empContribution || 0;
+      const emrContPerMeal = request.menu.emrContribution || 0;
+      
+      totalEmpContribution += (empContPerMeal * request.quantity);
+      totalEmrContribution += (emrContPerMeal * request.quantity);
+    });
+    
+    return {
+      plantId,
+      plantName,
+      plantCode,
+      menuName: sampleRequest.menu.name,
+      menuPrice: sampleRequest.menu.price,
+      quantity: totalQuantity,
+      empContribution: totalEmpContribution,
+      emrContribution: totalEmrContribution,
+      totalPrice,
+      visitorCount: counts.visitorCount,
+      mealRequestCount: counts.mealRequestCount,
+      canteenEntryCount: counts.canteenEntryCount
+    };
+  });
 
-  // Get other summary data with same IST boundaries
+  // Get global totals
+  const totalEmployees = await prisma.employee.count();
+  const totalVisitors = await prisma.visitorRequest.count({
+    where: {
+      visitDate: {
+        gte: startOfDay,
+        lte: endOfDay
+      }
+    }
+  });
+  const totalMealRequests = mealRequests.length;
+  const totalCanteenEntries = await prisma.canteenEntry.count({
+    where: {
+      logTime: {
+        gte: startOfDay,
+        lte: endOfDay
+      }
+    }
+  });
+
+  // Status counts
   const statusCounts = await prisma.mealRequest.groupBy({
     by: ["status"],
     where: whereClause,
@@ -589,31 +694,24 @@ const getDashboardData = async (filters, user) => {
     },
   });
 
-  const totalEmployees = await prisma.employee.count();
-  const totalVisitors = await prisma.visitorRequest.count();
-  const mealEntrys = await prisma.canteenEntry.count();
-
   // Use IST formatted dates for display in response
   const istFrom = convertToLocal(fromDate);
   const istTo = convertToLocal(toDate);
-  const dashboard_columns = getDashboardColumns();
-  const total_width = dashboard_columns.reduce((acc, item) => acc + item.width, 0);
+
   return {
-    data: summarizedData,
-    columns: dashboard_columns,
-    total_width: total_width,
+    data: plantSummaries,
+    columns: getDashboardColumns(),
     heading: {
       totalEmployees,
-      totalRequests: mealRequests.length,
+      totalRequests: totalMealRequests,
       totalVisitors,
-      totalMeals: mealEntrys
+      totalMeals: totalCanteenEntries
     },
     summary: {
       totalEmployees,
-      totalRequests: mealRequests.length,
+      totalRequests: totalMealRequests,
       totalVisitors,
-      totalWidth: total_width,
-      totalMeals: mealEntrys,
+      totalMeals: totalCanteenEntries,
       from: istFrom || null,
       to: istTo || null
     },

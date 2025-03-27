@@ -113,13 +113,12 @@ const getDashboardColumns = () => {
   return [
     { field: "plantName", headerName: "Plant", width: 300 },
     { field: "plantCode", headerName: "Plant Code", width: 300 },
-    { field: "menuName", headerName: "Meal Name", width: 300 },
-    { field: "quantity", headerName: "Quantity", width: 300 },
-    { field: "totalPrice", headerName: "Total Price", width: 300 },
-    { field: "empContribution", headerName: "Employee Contribution", width: 300 },
-    { field: "emrContribution", headerName: "Employee Contribution", width: 300 },
+    { field: "quantity", headerName: "Meal Requests", width: 300 },
+    { field: "canteenEntryCount", headerName: "Meal Entries", width: 300 },
+    { field: "visitorCount", headerName: "Visitors", width: 300 },
   ];
 };
+
 module.exports = {
   getUserColumns,
   getMenuColumns,
