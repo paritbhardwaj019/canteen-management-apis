@@ -44,7 +44,7 @@ const createUser = asyncHandler(async (req, res) => {
     roleId,
     department,
     isActive,
-  });
+  }, req.user);
 
   return ApiResponse.created(res, "User created successfully", newUser);
 });

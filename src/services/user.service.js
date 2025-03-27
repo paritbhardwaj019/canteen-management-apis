@@ -136,7 +136,7 @@ const getUserById = async (id) => {
  * @param {Object} userData - User data
  * @returns {Object} Newly created user
  */
-const createUser = async (userData) => {
+const createUser = async (userData, reqUser) => {
   const { email, password, firstName, lastName, roleId, department, isActive } =
     userData;
 
@@ -156,8 +156,13 @@ const createUser = async (userData) => {
     throw notFound("Role not found");
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
-
+  const hashedPassword = await bcrypt.hash(password, 10); 
+  let plantId = null;
+  if(userData.plantId){
+   plantId = userData.plantId;
+  }
+   
+  
   const newUser = await prisma.user.create({
     data: {
       email,
@@ -166,6 +171,7 @@ const createUser = async (userData) => {
       lastName,
       roleId,
       department,
+      plantId,
       isActive: isActive !== undefined ? isActive : true,
     },
     select: {
