@@ -36,7 +36,6 @@ const getMenuColumns = (userRole) => {
       headerName: "Employee Contribution",
       width: 150,
     },
-    { field: "name", headerName: "Name", width: 150 },
   ];
 
   if (userRole !== "Employee") {
