@@ -236,7 +236,13 @@ const updateEmployeePhoto = async (photoData) => {
     // if (!deviceSerialNumber) {
     //   throw badRequest("Device serial number is required");
     // }
-    console.log("deviceSerialNumber", employeeCode, employeePhoto, config.essl.username, config.essl.password);
+    console.log(
+      "deviceSerialNumber",
+      employeeCode,
+      employeePhoto,
+      config.essl.username,
+      config.essl.password
+    );
     const soapBody = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
@@ -259,7 +265,6 @@ const updateEmployeePhoto = async (photoData) => {
       data: soapBody,
     });
 
-
     const parser = new xml2js.Parser({ explicitArray: false });
     const result = await parser.parseStringPromise(response.data);
 
@@ -267,10 +272,9 @@ const updateEmployeePhoto = async (photoData) => {
       result["soap:Envelope"]["soap:Body"].UpdateEmployeePhotoResponse
         .UpdateEmployeePhotoResult;
     console.log("updateResult", updateResult);
-    // If photo update was successful, reset the opstamp
     if (updateResult && updateResult.includes("success")) {
       console.log("Photo update successful, resetting opstamp...");
-      const resetResult = await resetOpstamp("TFEE240900455");
+      const resetResult = await resetOpstamp("TFEE240900415");
       console.log("Opstamp reset result:", resetResult);
     }
 
@@ -291,7 +295,9 @@ const addNewLocation = async (locationData) => {
   try {
     const { deviceName, serialNumber, locationType } = locationData;
     if (!deviceName || !serialNumber || !locationType) {
-      throw badRequest("Device Name, Serial Number and Location Type are required");
+      throw badRequest(
+        "Device Name, Serial Number and Location Type are required"
+      );
     }
 
     // check if the device already exists

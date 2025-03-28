@@ -58,8 +58,8 @@ const registerEmployee = asyncHandler(async (req, res) => {
         photoBase64,
       }
     : {};
-    console.log("esslOptions", esslOptions);
-    console.log("photoBase64", photoBase64);
+  console.log("esslOptions", esslOptions);
+  console.log("photoBase64", photoBase64);
 
   const newEmployee = await employeeService.createEmployee(
     {
@@ -116,7 +116,7 @@ const uploadEmployeePhoto = asyncHandler(async (req, res) => {
       esslResult = await employeeService.updateEmployeePhotoInEssl(
         id,
         photoBase64,
-        "TFEE240900455"
+        "TFEE240900415"
       );
     } catch (error) {
       console.error("ESSL photo update failed:", error);
@@ -267,7 +267,7 @@ const updateEmployeePhotoInEssl = asyncHandler(async (req, res) => {
   const result = await employeeService.updateEmployeePhotoInEssl(
     id,
     photoBase64,
-    "TFEE240900455"
+    "TFEE240900415"
   );
 
   return ApiResponse.ok(res, result.message, result);
@@ -313,7 +313,6 @@ const getEmployeesByDepartment = asyncHandler(async (req, res) => {
     }
   );
 });
-
 
 /**
  * Disable an employee

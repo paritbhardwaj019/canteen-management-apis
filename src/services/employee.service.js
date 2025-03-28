@@ -789,7 +789,11 @@ const registerEmployeeInEssl = async (id, esslOptions = {}) => {
  * @param {String} photoBase64 - Base64 encoded photo data
  * @returns {Object} Result of the operation
  */
-const updateEmployeePhotoInEssl = async (id, photoBase64, deviceSerialNumber) => {
+const updateEmployeePhotoInEssl = async (
+  id,
+  photoBase64,
+  deviceSerialNumber
+) => {
   const employee = await prisma.employee.findUnique({
     where: { id },
     include: {
@@ -827,7 +831,7 @@ const updateEmployeePhotoInEssl = async (id, photoBase64, deviceSerialNumber) =>
     const result = await esslService.updateEmployeePhoto({
       employeeCode: employee.employeeNo,
       employeePhoto: photoBase64,
-      deviceSerialNumber: "TFEE240900455",
+      deviceSerialNumber: "TFEE240900415",
     });
 
     return {
@@ -1126,11 +1130,16 @@ const disableEmployee = async (id, status) => {
   console.log(status, id);
 
   try {
-    const existingEmployee = await prisma.employee.findUnique({ where: { id } });
+    const existingEmployee = await prisma.employee.findUnique({
+      where: { id },
+    });
     if (!existingEmployee) {
       throw notFound("Employee not found");
     }
-    const employee = await prisma.user.update({ where: { id: existingEmployee.userId }, data: { isActive: status === "true" ? true : false } });
+    const employee = await prisma.user.update({
+      where: { id: existingEmployee.userId },
+      data: { isActive: status === "true" ? true : false },
+    });
     return employee;
   } catch (error) {
     console.error("Error disabling employee:", error);
