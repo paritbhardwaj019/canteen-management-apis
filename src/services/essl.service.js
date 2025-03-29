@@ -370,7 +370,7 @@ const resetOpstamp = async (deviceSerialNumber) => {
 
     const response = await axios({
       method: "post",
-      url: `http://103.254.247.98:8080/iclock/webservice.asmx?op=DeviceCommand_ResetOPStamp`,
+      url: `${config.essl.bioServerUrl}/iclock/webservice.asmx?op=DeviceCommand_ResetOPStamp`,
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
         SOAPAction: "http://tempuri.org/DeviceCommand_ResetOPStamp",
@@ -427,7 +427,7 @@ const updateEmployeeFaceInDevice = async (faceData) => {
 
     const response = await axios({
       method: "post",
-      url: `http://103.254.247.98:8080/iclock/webservice.asmx?op=DeviceCommand_EnrollFace`,
+      url: `${config.essl.bioServerUrl}/iclock/webservice.asmx?op=DeviceCommand_EnrollFace`,
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
         SOAPAction: "http://tempuri.org/DeviceCommand_EnrollFace",
