@@ -411,6 +411,8 @@ const updateEmployeeFaceInDevice = async (faceData) => {
   try {
     const { employeeCode, deviceSerialNumber } = faceData;
 
+    console.log("updateEmployeeFaceInDevice", faceData);
+
     if (!employeeCode) {
       throw badRequest("Employee code is required");
     }
@@ -441,6 +443,8 @@ const updateEmployeeFaceInDevice = async (faceData) => {
       data: soapBody,
     });
 
+    console.log("Face enrollment response in device:", response.data);
+
     const parser = new xml2js.Parser({ explicitArray: false });
     const result = await parser.parseStringPromise(response.data);
 
@@ -448,7 +452,7 @@ const updateEmployeeFaceInDevice = async (faceData) => {
       result["soap:Envelope"]["soap:Body"].DeviceCommand_EnrollFaceResponse
         .DeviceCommand_EnrollFaceResult;
 
-    console.log("Face enrollment result:", enrollResult);
+    console.log("Face enrollment result in device:", enrollResult);
 
     if (enrollResult && enrollResult.includes("success")) {
       console.log("Face enrollment successful, resetting opstamp...");

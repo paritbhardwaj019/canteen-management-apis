@@ -183,16 +183,12 @@ const createEmployee = async (
             employeePhoto: photoBase64,
           });
 
-          const response1 = await esslService.updateEmployeeFaceInDevice({
+          await esslService.updateEmployeeFaceInDevice({
             employeeCode: result.employee.employeeNo,
             deviceSerialNumber: config.essl.deviceSerialNumber,
           });
 
-          const response2 = await esslService.resetOpstamp(
-            config.essl.deviceSerialNumber
-          );
-
-          console.log(response1, response2);
+          await esslService.resetOpstamp(config.essl.deviceSerialNumber);
         } catch (photoError) {
           console.error(
             "Failed to upload employee photo to ESSL system:",
@@ -514,7 +510,7 @@ const updateEmployee = async (
   const {
     location = "BHIMASAR",
     role = "Employee",
-    verificationType = "Card",
+    verificationType = "Finger or Face or Card or Password",
     photoBase64,
   } = esslOptions;
 
@@ -676,7 +672,7 @@ const registerEmployeeInEssl = async (id, esslOptions = {}) => {
   const {
     location = "BHIMASAR",
     role = "Employee",
-    verificationType = "Card",
+    verificationType = "Finger or Face or Card or Password",
     photoBase64,
   } = esslOptions;
 
@@ -1039,7 +1035,6 @@ const resetEmployeePassword = async (id) => {
     throw notFound("Employee not found");
   }
 
-  // Get the first photo URL if available
   const photoUrl =
     employee.photos && employee.photos.length > 0
       ? employee.photos[0].url
