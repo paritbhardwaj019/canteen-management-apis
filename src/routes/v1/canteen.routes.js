@@ -13,10 +13,8 @@ router.put(
   authenticate,
   canteenController.approveEntry
 );
-router.get(
-  "/report",
-  authenticate,
-  canteenController.getCanteenReport
-);
+router.get("/report", authenticate, canteenController.getCanteenReport);
+
+router.get("/monthly-report", authenticate, canteenController.getMonthlyReport);
 
 module.exports = router;

@@ -278,15 +278,26 @@ const updateEmployeePhotoInEssl = asyncHandler(async (req, res) => {
  */
 const deleteEmployee = asyncHandler(async (req, res) => {
   const { id } = req.params;
+  const { deleteFromEssl = true } = req.body;
 
   const employee = await employeeService.getEmployeeById(id);
 
-  await employeeService.deleteEmployee(id);
+  const result = await employeeService.deleteEmployee(id, deleteFromEssl);
 
-  // The ESSL service doesn't currently provide a method to delete employees from ESSL system
-  // If such functionality is needed, it should be implemented in the ESSL service first
-
-  return ApiResponse.ok(res, "Employee deleted successfully", {});
+  return ApiResponse.ok(res, "Employee deleted successfully", {
+    employee: {
+      employeeNo: employee.employeeNo,
+      name: `${employee.firstName} ${employee.lastName}`,
+    },
+    esslDeletion: deleteFromEssl
+      ? {
+          success:
+            result.esslDeletionResult &&
+            result.esslDeletionResult.includes("success"),
+          details: result.esslDeletionResult,
+        }
+      : null,
+  });
 });
 
 /**

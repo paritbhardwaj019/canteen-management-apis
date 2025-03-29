@@ -99,6 +99,10 @@ const processLocationLogs = async (date, locationType) => {
           where: { employeeNo: log.user },
         });
 
+        const canteeenPlant = await prisma.plant.findFirst({
+          where: { location: locationType },
+        });
+
         if (!employee) {
           console.log(`No employee found for code: ${log.user}`);
           return null;
@@ -123,8 +127,8 @@ const processLocationLogs = async (date, locationType) => {
               employeeId: employee.id,
               status: "PENDING",
               logTime: parsedLogTime,
-              location: locationType, // Use locationType as the location
-              plantId: employee.user?.plantId, // Use employee's plant if available
+              location: locationType,
+              ...(canteeenPlant ? { plantId: canteeenPlant.id } : {}),
             },
             include: {
               employee: {
@@ -171,8 +175,6 @@ const processLocationLogs = async (date, locationType) => {
 const getAllEntries = async (loggedInUser, filters = {}) => {
   const { role, id, plantId } = loggedInUser;
   const { date, location } = filters;
-
-  console.log("LOGGED IN USER", loggedInUser);
 
   if (role === "Employee") {
     throw badRequest("You are not authorized to access this resource");
@@ -235,7 +237,7 @@ const getAllEntries = async (loggedInUser, filters = {}) => {
                   locationType: {
                     contains: assignedPlantLocation.split(" ")[0],
                   },
-                }, // Try with first word
+                },
               ],
             },
           });
@@ -367,7 +369,7 @@ const approveEntry = async (id, status) => {
 
 const getCanteenReport = async (loggedInUser, filters = {}) => {
   const { fromDate, toDate } = filters;
-  const { plantId } = loggedInUser;
+
   if (!fromDate) {
     throw badRequest("From date is required");
   }
@@ -393,7 +395,6 @@ const getCanteenReport = async (loggedInUser, filters = {}) => {
           plantCode: true,
         },
       },
-
       employee: {
         select: {
           employeeNo: true,
@@ -413,8 +414,8 @@ const getCanteenReport = async (loggedInUser, filters = {}) => {
 
   entries = entries.map((entry) => ({
     ...entry,
-    plantName: entry.plant?.name || "N/A",
-    plantCode: entry.plant?.plantCode || "N/A",
+    plantName: entry.plant?.name,
+    plantCode: entry.plant?.plantCode,
     date: entry.logTime.toISOString().split("T")[0],
     employeeNo: entry.employee.employeeNo,
     employeeName:
@@ -431,9 +432,157 @@ const getCanteenReport = async (loggedInUser, filters = {}) => {
   return { entries, columns: getCanteenReportColumns() };
 };
 
+/**
+ * Generate a monthly canteen usage report
+ * @param {Object} loggedInUser - Current logged in user with role and other info
+ * @param {Object} filters - Filters { month: Integer }
+ * @returns {Promise<Object>} Report data with entries and columns
+ */
+const getMonthlyReport = async (loggedInUser, filters = {}) => {
+  const { month = 0 } = filters;
+
+  const monthValue = parseInt(month, 10);
+
+  const today = new Date();
+  let fromDate, toDate;
+
+  if (monthValue === 0) {
+    fromDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    toDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  } else if (monthValue > 0) {
+    toDate = new Date(today.getFullYear(), today.getMonth(), 0);
+    fromDate = new Date(today.getFullYear(), today.getMonth() - monthValue, 1);
+  } else {
+    throw badRequest("Month parameter must be 0 or a positive integer");
+  }
+
+  const fromDateStr = fromDate.toISOString().split("T")[0];
+  const toDateStr = toDate.toISOString().split("T")[0];
+
+  console.log(`Generating report from ${fromDateStr} to ${toDateStr}`);
+
+  try {
+    let entries = await prisma.canteenEntry.findMany({
+      where: {
+        logTime: {
+          gte: fromDate,
+          lte: toDate,
+        },
+        status: "APPROVED",
+      },
+      include: {
+        plant: {
+          select: {
+            name: true,
+            plantCode: true,
+          },
+        },
+        employee: {
+          select: {
+            employeeNo: true,
+            department: true,
+            designation: true,
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+                department: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ logTime: "asc" }, { employeeId: "asc" }],
+    });
+
+    const meals = await prisma.menu.findMany({});
+    const defaultMeal = meals[0];
+
+    entries = entries.map((entry) => ({
+      id: entry.id,
+      plantName: entry.plant?.name || "N/A",
+      plantCode: entry.plant?.plantCode || "N/A",
+      date: entry.logTime.toISOString().split("T")[0],
+      employeeNo: entry.employee.employeeNo,
+      employeeName: `${entry.employee.user.firstName} ${entry.employee.user.lastName}`,
+      department:
+        entry.employee.department || entry.employee.user.department || "N/A",
+      designation: entry.employee.designation || "N/A",
+      logTime: entry.logTime.toISOString(),
+      formattedTime: new Date(entry.logTime).toLocaleTimeString(),
+      quantity: 1,
+      employerContribution: defaultMeal.emrContribution,
+      employeeContribution: defaultMeal.empContribution,
+      price: defaultMeal.price,
+      meal: defaultMeal.name,
+      mealType: defaultMeal.type,
+      totalAmount: defaultMeal.price,
+    }));
+
+    const summary = {
+      reportPeriod: `${fromDateStr} to ${toDateStr}`,
+      totalEntries: entries.length,
+      totalEmployees: new Set(entries.map((e) => e.employeeNo)).size,
+      totalAmount: entries.reduce((sum, entry) => sum + entry.price, 0),
+      plantWiseCounts: {},
+      departmentWiseCounts: {},
+      dateWiseCounts: {},
+    };
+
+    entries.forEach((entry) => {
+      if (!summary.plantWiseCounts[entry.plantName]) {
+        summary.plantWiseCounts[entry.plantName] = {
+          count: 0,
+          amount: 0,
+        };
+      }
+      summary.plantWiseCounts[entry.plantName].count += 1;
+      summary.plantWiseCounts[entry.plantName].amount += entry.price;
+
+      if (!summary.departmentWiseCounts[entry.department]) {
+        summary.departmentWiseCounts[entry.department] = {
+          count: 0,
+          amount: 0,
+        };
+      }
+      summary.departmentWiseCounts[entry.department].count += 1;
+      summary.departmentWiseCounts[entry.department].amount += entry.price;
+
+      if (!summary.dateWiseCounts[entry.date]) {
+        summary.dateWiseCounts[entry.date] = {
+          count: 0,
+          amount: 0,
+        };
+      }
+      summary.dateWiseCounts[entry.date].count += 1;
+      summary.dateWiseCounts[entry.date].amount += entry.price;
+    });
+
+    return {
+      reportType:
+        monthValue === 0
+          ? "Current Month"
+          : monthValue === 1
+          ? "Previous Month"
+          : `Last ${monthValue} Months`,
+      period: {
+        fromDate: fromDateStr,
+        toDate: toDateStr,
+      },
+      entries,
+      summary,
+      columns: getCanteenReportColumns(),
+    };
+  } catch (error) {
+    console.error("Error generating monthly report:", error);
+    throw badRequest(`Failed to generate monthly report: ${error.message}`);
+  }
+};
+
 module.exports = {
   getAllEntries,
   approveEntry,
   getCanteenReport,
+  getMonthlyReport,
 };
-

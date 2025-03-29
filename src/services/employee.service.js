@@ -245,31 +245,6 @@ const createEmployee = async (
 };
 
 /**
- * Add a photo to an employee
- * @param {String} employeeId - Employee ID
- * @param {String} photoUrl - URL of the uploaded photo
- * @returns {Object} Added photo information
- */
-const addEmployeePhoto = async (employeeId, photoUrl) => {
-  const employee = await prisma.employee.findUnique({
-    where: { id: employeeId },
-  });
-
-  if (!employee) {
-    throw notFound("Employee not found");
-  }
-
-  const photo = await prisma.employeePhoto.create({
-    data: {
-      url: photoUrl,
-      employeeId: employee.id,
-    },
-  });
-
-  return photo;
-};
-
-/**
  * Get all employees with pagination and filtering
  * @param {Object} options - Filter and pagination options
  * @returns {Object} Paginated list of employees and total count
@@ -336,7 +311,7 @@ const getAllEmployees = async (options) => {
           },
         },
       },
-      ...(includePhotos || { photos: true }), // Always include photos to get the photoUrl
+      ...(includePhotos || { photos: true }),
     },
     skip,
     take: 1000,
@@ -866,9 +841,10 @@ const updateEmployeePhotoInEssl = async (
 /**
  * Delete an employee
  * @param {String} id - Employee ID
- * @returns {Boolean} Success status
+ * @param {Boolean} deleteFromEssl - Whether to delete employee from ESSL system
+ * @returns {Object} Result with success status and ESSL deletion result
  */
-const deleteEmployee = async (id) => {
+const deleteEmployee = async (id, deleteFromEssl = true) => {
   const employee = await prisma.employee.findUnique({
     where: { id },
     include: {
@@ -880,10 +856,8 @@ const deleteEmployee = async (id) => {
     throw notFound("Employee not found");
   }
 
-  // Delete all photos from cloudinary
   if (employee.photos && employee.photos.length > 0) {
     for (const photo of employee.photos) {
-      // Extract public_id from the URL
       const urlParts = photo.url.split("/");
       const filenameWithExt = urlParts[urlParts.length - 1];
       const filename = filenameWithExt.split(".")[0];
@@ -893,6 +867,18 @@ const deleteEmployee = async (id) => {
       const publicId = folderPath.substring(0, folderPath.lastIndexOf("."));
 
       await deleteFile(publicId);
+    }
+  }
+
+  let esslDeletionResult = null;
+  if (deleteFromEssl && employee.isEsslRegistered) {
+    try {
+      esslDeletionResult = await esslService.deleteEmployee(
+        employee.employeeNo
+      );
+      console.log("ESSL deletion result:", esslDeletionResult);
+    } catch (error) {
+      console.error("Error deleting employee from ESSL system:", error);
     }
   }
 
@@ -910,7 +896,10 @@ const deleteEmployee = async (id) => {
     }),
   ]);
 
-  return true;
+  return {
+    success: true,
+    esslDeletionResult: esslDeletionResult,
+  };
 };
 
 /**
@@ -933,7 +922,6 @@ const deleteEmployeePhoto = async (employeeId, photoId) => {
     );
   }
 
-  // Extract public_id from the URL
   const urlParts = photo.url.split("/");
   const filenameWithExt = urlParts[urlParts.length - 1];
   const filename = filenameWithExt.split(".")[0];
@@ -942,10 +930,8 @@ const deleteEmployeePhoto = async (employeeId, photoId) => {
     .join("/");
   const publicId = folderPath.substring(0, folderPath.lastIndexOf("."));
 
-  // Delete file from Cloudinary
   await deleteFile(publicId);
 
-  // Delete photo record from database
   await prisma.employeePhoto.delete({
     where: { id: photoId },
   });
@@ -1154,6 +1140,31 @@ const disableEmployee = async (id, status) => {
     console.error("Error disabling employee:", error);
     throw serverError("Failed to disable employee");
   }
+};
+
+/**
+ * Add a photo to an employee
+ * @param {String} employeeId - Employee ID
+ * @param {String} photoUrl - URL of the uploaded photo
+ * @returns {Object} Added photo information
+ */
+const addEmployeePhoto = async (employeeId, photoUrl) => {
+  const employee = await prisma.employee.findUnique({
+    where: { id: employeeId },
+  });
+
+  if (!employee) {
+    throw notFound("Employee not found");
+  }
+
+  const photo = await prisma.employeePhoto.create({
+    data: {
+      url: photoUrl,
+      employeeId: employee.id,
+    },
+  });
+
+  return photo;
 };
 
 module.exports = {

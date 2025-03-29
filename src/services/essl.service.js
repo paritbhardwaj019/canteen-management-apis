@@ -491,6 +491,57 @@ const updateEmployeeFaceInDevice = async (faceData) => {
   }
 };
 
+/**
+ * Delete an employee from the ESSL system
+ * @param {String} employeeCode - Employee number/code
+ * @returns {Promise<String>} Deletion result
+ */
+const deleteEmployee = async (employeeCode) => {
+  try {
+    if (!employeeCode) {
+      throw badRequest("Employee code is required");
+    }
+
+    const soapBody = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <DeleteEmployee xmlns="http://tempuri.org/">
+      <UserName>${config.essl.username}</UserName>
+      <Password>${config.essl.password}</Password>
+      <EmployeeCode>${employeeCode}</EmployeeCode>
+    </DeleteEmployee>
+  </soap:Body>
+</soap:Envelope>`;
+
+    const response = await axios({
+      method: "post",
+      url: `${config.essl.bioServerUrl}/iclock/webservice.asmx?op=DeleteEmployee`,
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        SOAPAction: "http://tempuri.org/DeleteEmployee",
+      },
+      data: soapBody,
+    });
+
+    const parser = new xml2js.Parser({ explicitArray: false });
+    const result = await parser.parseStringPromise(response.data);
+
+    const deleteResult =
+      result["soap:Envelope"]["soap:Body"].DeleteEmployeeResponse
+        .DeleteEmployeeResult;
+
+    return deleteResult;
+  } catch (error) {
+    console.error("Error deleting employee from ESSL system:", error);
+    if (error.response) {
+      throw badRequest(
+        `ESSL API Error: ${error.response.data || error.message}`
+      );
+    }
+    throw serverError(`Error connecting to ESSL server: ${error.message}`);
+  }
+};
+
 const esslService = {
   getAllDevices,
   getDeviceLogs,
@@ -502,6 +553,7 @@ const esslService = {
   deleteLocation,
   updateLocation,
   updateEmployeeFaceInDevice,
+  deleteEmployee,
 };
 
 module.exports = esslService;

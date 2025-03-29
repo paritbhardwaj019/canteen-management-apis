@@ -308,6 +308,56 @@ const deletePlant = async (id) => {
 };
 
 /**
+ * Generate a unique user code in format PL01_CAT_01
+ * @param {String} plantCode - Plant code (e.g., PL01)
+ * @param {String} roleName - User role name
+ * @returns {String} Generated user code
+ */
+const generateUserCode = async (plantCode, roleName) => {
+  // Get role abbreviation (max 3 uppercase letters)
+  const roleAbbr = roleName.substring(0, 3).toUpperCase();
+
+  // Find the highest existing sequence number for this plant code and role
+  const codePrefix = `${plantCode}_${roleAbbr}_`;
+
+  const existingUsers = await prisma.user.findMany({
+    where: {
+      code: {
+        startsWith: codePrefix,
+      },
+    },
+    select: {
+      code: true,
+    },
+  });
+
+  // Extract the sequence numbers and find the max
+  let maxSequence = 0;
+  existingUsers.forEach((user) => {
+    if (user.code && user.code.startsWith(codePrefix)) {
+      const seqStr = user.code.substring(codePrefix.length);
+      const seqNum = parseInt(seqStr, 10);
+      if (!isNaN(seqNum) && seqNum > maxSequence) {
+        maxSequence = seqNum;
+      }
+    }
+  });
+
+  // Generate the next sequence number
+  const nextSequence = maxSequence + 1;
+  if (nextSequence > 99) {
+    throw badRequest(
+      "Maximum user code sequence number reached for this plant and role"
+    );
+  }
+
+  // Format the sequence number with leading zero if needed
+  const sequenceStr = nextSequence.toString().padStart(2, "0");
+
+  return `${plantCode}_${roleAbbr}_${sequenceStr}`;
+};
+
+/**
  * Add user to plant with optional plant head assignment
  * @param {Object} userData - User data with plant assignment info
  * @param {Object} loggedInUser - Currently logged in user
@@ -343,21 +393,30 @@ const addUserToPlant = async (userData, loggedInUser) => {
     plantId = plant?.id;
   }
 
+  let plant;
   if (plantId) {
-    const plant = await prisma.plant.findUnique({
+    plant = await prisma.plant.findUnique({
       where: { id: plantId },
     });
 
     if (!plant) {
       throw notFound("Plant not found");
     }
+  } else {
+    throw badRequest("Plant ID is required");
   }
+
+  // Get the plant code for user code generation
+  const plantCode = plant.plantCode;
 
   let user = await prisma.user.findUnique({
     where: { email },
   });
 
   const transaction = [];
+
+  // Generate user code in format PL01_CAT_01
+  const code = await generateUserCode(plantCode, userRole.name);
 
   if (user) {
     if (user.plantId && user.plantId !== plantId) {
@@ -370,6 +429,7 @@ const addUserToPlant = async (userData, loggedInUser) => {
       department,
       plantId,
       isPlantHead: isPlantHead || false,
+      code,
     };
 
     if (userRole) {
@@ -396,6 +456,7 @@ const addUserToPlant = async (userData, loggedInUser) => {
           roleId: userRole.id,
           plantId,
           isPlantHead: isPlantHead || false,
+          code,
         },
       })
     );
@@ -466,7 +527,6 @@ const addUserToPlant = async (userData, loggedInUser) => {
  * @returns {Object} User with updated plant assignment
  */
 const removeUserFromPlant = async (plantId, userId, loggedInUser) => {
-  // Check if plant exists
   const plant = await prisma.plant.findUnique({
     where: { id: plantId },
   });
@@ -475,7 +535,6 @@ const removeUserFromPlant = async (plantId, userId, loggedInUser) => {
     throw notFound("Plant not found");
   }
 
-  // Check if user exists
   const user = await prisma.user.findUnique({
     where: { id: userId },
   });
@@ -484,15 +543,12 @@ const removeUserFromPlant = async (plantId, userId, loggedInUser) => {
     throw notFound("User not found");
   }
 
-  // Check if user is assigned to this plant
   if (user.plantId !== plantId) {
     throw badRequest("User is not assigned to this plant");
   }
 
-  // Prepare transaction actions
   const transaction = [];
 
-  // If user is plant head, update the plant to remove the plant head
   if (plant.plantHeadId === userId) {
     transaction.push(
       prisma.plant.update({
@@ -505,18 +561,17 @@ const removeUserFromPlant = async (plantId, userId, loggedInUser) => {
     );
   }
 
-  // Update user to remove plant assignment and plant head status
   transaction.push(
     prisma.user.update({
       where: { id: userId },
       data: {
         plantId: null,
         isPlantHead: false,
+        code: null,
       },
     })
   );
 
-  // Execute transaction
   const [updatedUser] = await prisma.$transaction(transaction);
 
   return updatedUser;
@@ -539,6 +594,7 @@ const getAvailableUsers = async (plantId) => {
       email: true,
       department: true,
       isPlantHead: true,
+      code: true,
       role: {
         select: {
           id: true,
@@ -576,6 +632,7 @@ const getPlantUsers = async (plantId) => {
           email: true,
           department: true,
           isPlantHead: true,
+          code: true,
           createdAt: true,
           role: {
             select: {
@@ -600,6 +657,7 @@ const getPlantUsers = async (plantId) => {
     role: user.role.name,
     department: user.department || "",
     isPlantHead: user.isPlantHead ? "Yes" : "No",
+    code: user.code || "",
     dateRegistered: user.createdAt.toISOString(),
     createdAt: user.createdAt.toISOString(),
   }));
@@ -610,6 +668,7 @@ const getPlantUsers = async (plantId) => {
     { field: "email", headerName: "Email", width: 200 },
     { field: "role", headerName: "Role", width: 150 },
     { field: "department", headerName: "Department", width: 150 },
+    { field: "userCode", headerName: "User Code", width: 150 },
     { field: "isPlantHead", headerName: "Plant Head", width: 100 },
     { field: "dateRegistered", headerName: "Date Registered", width: 150 },
     { field: "createdAt", headerName: "Created At", width: 150 },
@@ -627,10 +686,6 @@ const getPlantUsers = async (plantId) => {
     columns: columns,
   };
 };
-
-
-
-
 
 module.exports = {
   createPlant,

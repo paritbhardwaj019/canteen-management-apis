@@ -40,8 +40,22 @@ const getCanteenReport = asyncHandler(async (req, res) => {
   return ApiResponse.ok(res, "Canteen report retrieved successfully", report);
 });
 
+const getMonthlyReport = asyncHandler(async (req, res) => {
+  const { month = 0 } = req.query;
+  const filters = { month };
+
+  const result = await canteenService.getMonthlyReport(req.user, filters);
+
+  return ApiResponse.ok(
+    res,
+    "Monthly canteen report generated successfully",
+    result
+  );
+});
+
 module.exports = {
   getAllTodaysEntries,
   approveEntry,
   getCanteenReport,
+  getMonthlyReport,
 };
