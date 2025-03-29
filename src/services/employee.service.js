@@ -78,7 +78,7 @@ const createEmployee = async (
   } = employeeData;
 
   const {
-    location = "BHIMASAR",
+    location = config.essl.deviceLocation,
     role = "Normal User",
     verificationType = "Finger or Face or Card or Password",
     photoBase64,
@@ -521,7 +521,7 @@ const updateEmployee = async (
   } = employeeData;
 
   const {
-    location = "BHIMASAR",
+    location = config.essl.deviceLocation,
     role = "Employee",
     verificationType = "Finger or Face or Card or Password",
     photoBase64,
@@ -683,7 +683,7 @@ const updateEmployee = async (
  */
 const registerEmployeeInEssl = async (id, esslOptions = {}) => {
   const {
-    location = "BHIMASAR",
+    location = config.essl.deviceLocation,
     role = "Employee",
     verificationType = "Finger or Face or Card or Password",
     photoBase64,

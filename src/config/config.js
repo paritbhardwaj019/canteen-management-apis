@@ -38,6 +38,7 @@ const config = {
     username: process.env.ESSL_USERNAME,
     password: process.env.ESSL_PASSWORD,
     deviceSerialNumber: process.env.ESSL_DEVICE_SERIAL_NUMBER,
+    deviceLocation: process.env.ESSL_DEVICE_LOCATION,
   },
 
   cloudinary: {

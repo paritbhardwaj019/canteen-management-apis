@@ -157,7 +157,7 @@ const updateEmployee = async (employeeData) => {
     const {
       employeeCode,
       employeeName,
-      employeeLocation = "BHIMASAR",
+      employeeLocation = config.essl.deviceLocation,
       employeeRole = "Normal User",
       employeeVerificationType = "Finger or Face or Card or Password",
     } = employeeData;
