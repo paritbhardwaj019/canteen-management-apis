@@ -9,6 +9,7 @@ const {
 } = require("../utils/api.error");
 const { deleteFile } = require("../middlewares/upload.middleware");
 const esslService = require("./essl.service");
+const config = require("../config/config");
 
 /**
  * Get employee columns for data table
@@ -82,9 +83,7 @@ const createEmployee = async (
     verificationType = "Finger or Face or Card or Password",
     photoBase64,
   } = esslOptions;
-  console.log("esslOptions", esslOptions);
 
-  // Check if employee with the same employee number already exists
   const existingEmployee = await prisma.employee.findUnique({
     where: { employeeNo },
   });
@@ -95,9 +94,7 @@ const createEmployee = async (
     );
   }
 
-  // Create employee in a transaction
   const result = await prisma.$transaction(async (prisma) => {
-    // Find the Employee role
     const employeeRole = await prisma.role.findFirst({
       where: { name: "Employee" },
     });
@@ -178,8 +175,7 @@ const createEmployee = async (
 
       let registrationSuccess =
         esslRegistrationResult && esslRegistrationResult.includes("success");
-      console.log("esslRegistrationResult", esslRegistrationResult);
-      console.log("photoBase64", photoBase64);
+
       if (registrationSuccess && photoBase64) {
         try {
           esslPhotoResult = await esslService.updateEmployeePhoto({
@@ -188,9 +184,14 @@ const createEmployee = async (
           });
 
           if (!esslPhotoResult || !esslPhotoResult.includes("success")) {
-            console.warn(
-              `ESSL photo upload succeeded but returned unexpected result: ${esslPhotoResult}`
-            );
+            const res = await esslService.updateEmployeeFaceInDevice({
+              employeeCode: result.employee.employeeNo,
+              deviceSerialNumber: config.essl.deviceSerialNumber,
+            });
+
+            console.log("Face enrollment result:", res);
+
+            await esslService.resetOpstamp(config.essl.deviceSerialNumber);
           }
         } catch (photoError) {
           console.error(
@@ -831,7 +832,7 @@ const updateEmployeePhotoInEssl = async (
     const result = await esslService.updateEmployeePhoto({
       employeeCode: employee.employeeNo,
       employeePhoto: photoBase64,
-      deviceSerialNumber: "TFEE240900415",
+      deviceSerialNumber: "TFEE240900455",
     });
 
     return {

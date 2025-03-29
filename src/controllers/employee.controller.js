@@ -116,7 +116,7 @@ const uploadEmployeePhoto = asyncHandler(async (req, res) => {
       esslResult = await employeeService.updateEmployeePhotoInEssl(
         id,
         photoBase64,
-        "TFEE240900415"
+        "TFEE240900455"
       );
     } catch (error) {
       console.error("ESSL photo update failed:", error);
@@ -267,7 +267,7 @@ const updateEmployeePhotoInEssl = asyncHandler(async (req, res) => {
   const result = await employeeService.updateEmployeePhotoInEssl(
     id,
     photoBase64,
-    "TFEE240900415"
+    "TFEE240900455"
   );
 
   return ApiResponse.ok(res, result.message, result);

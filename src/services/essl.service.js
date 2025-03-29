@@ -236,13 +236,7 @@ const updateEmployeePhoto = async (photoData) => {
     // if (!deviceSerialNumber) {
     //   throw badRequest("Device serial number is required");
     // }
-    console.log(
-      "deviceSerialNumber",
-      employeeCode,
-      employeePhoto,
-      config.essl.username,
-      config.essl.password
-    );
+
     const soapBody = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
@@ -271,12 +265,6 @@ const updateEmployeePhoto = async (photoData) => {
     const updateResult =
       result["soap:Envelope"]["soap:Body"].UpdateEmployeePhotoResponse
         .UpdateEmployeePhotoResult;
-    console.log("updateResult", updateResult);
-    if (updateResult && updateResult.includes("success")) {
-      console.log("Photo update successful, resetting opstamp...");
-      const resetResult = await resetOpstamp("TFEE240900415");
-      console.log("Opstamp reset result:", resetResult);
-    }
 
     return updateResult;
   } catch (error) {
@@ -290,7 +278,6 @@ const updateEmployeePhoto = async (photoData) => {
   }
 };
 
-// add new device in locations table
 const addNewLocation = async (locationData) => {
   try {
     const { deviceName, serialNumber, locationType } = locationData;
@@ -300,7 +287,6 @@ const addNewLocation = async (locationData) => {
       );
     }
 
-    // check if the device already exists
     const existingDevice = await prisma.locations.findFirst({
       where: { serialNumber },
     });
@@ -412,6 +398,74 @@ const resetOpstamp = async (deviceSerialNumber) => {
   }
 };
 
+/**
+ * Update an employee's face data in a specific device
+ * @param {Object} faceData - Employee face enrollment data
+ * @param {String} faceData.employeeCode - Employee number/code
+ * @param {String} faceData.deviceSerialNumber - Serial number of the target device
+ * @returns {Promise<String>} Face enrollment result
+ */
+const updateEmployeeFaceInDevice = async (faceData) => {
+  try {
+    const { employeeCode, deviceSerialNumber } = faceData;
+
+    if (!employeeCode) {
+      throw badRequest("Employee code is required");
+    }
+
+    if (!deviceSerialNumber) {
+      throw badRequest("Device serial number is required");
+    }
+
+    const soapBody = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <DeviceCommand_EnrollFace xmlns="http://tempuri.org/">
+      <UserName>${config.essl.username}</UserName>
+      <Password>${config.essl.password}</Password>
+      <DeviceSerialNumber>${deviceSerialNumber}</DeviceSerialNumber>
+      <EmployeeCode>${employeeCode}</EmployeeCode>
+    </DeviceCommand_EnrollFace>
+  </soap:Body>
+</soap:Envelope>`;
+
+    const response = await axios({
+      method: "post",
+      url: `${config.essl.bioServerUrl}/iclock/webservice.asmx?op=DeviceCommand_EnrollFace`,
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        SOAPAction: "http://tempuri.org/DeviceCommand_EnrollFace",
+      },
+      data: soapBody,
+    });
+
+    const parser = new xml2js.Parser({ explicitArray: false });
+    const result = await parser.parseStringPromise(response.data);
+
+    const enrollResult =
+      result["soap:Envelope"]["soap:Body"].DeviceCommand_EnrollFaceResponse
+        .DeviceCommand_EnrollFaceResult;
+
+    console.log("Face enrollment result:", enrollResult);
+
+    if (enrollResult && enrollResult.includes("success")) {
+      console.log("Face enrollment successful, resetting opstamp...");
+      const resetResult = await resetOpstamp(deviceSerialNumber);
+      console.log("Opstamp reset result:", resetResult);
+    }
+
+    return enrollResult;
+  } catch (error) {
+    console.error("Error enrolling employee face in device:", error);
+    if (error.response) {
+      throw badRequest(
+        `ESSL API Error: ${error.response.data || error.message}`
+      );
+    }
+    throw serverError(`Error connecting to ESSL server: ${error.message}`);
+  }
+};
+
 const esslService = {
   getAllDevices,
   getDeviceLogs,
@@ -422,6 +476,7 @@ const esslService = {
   getAllLocations,
   deleteLocation,
   updateLocation,
+  updateEmployeeFaceInDevice,
 };
 
 module.exports = esslService;
