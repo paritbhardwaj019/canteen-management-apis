@@ -183,12 +183,16 @@ const createEmployee = async (
             employeePhoto: photoBase64,
           });
 
-          await esslService.updateEmployeeFaceInDevice({
+          const response1 = await esslService.updateEmployeeFaceInDevice({
             employeeCode: result.employee.employeeNo,
             deviceSerialNumber: config.essl.deviceSerialNumber,
           });
 
-          await esslService.resetOpstamp(config.essl.deviceSerialNumber);
+          const response2 = await esslService.resetOpstamp(
+            config.essl.deviceSerialNumber
+          );
+
+          console.log(response1, response2);
         } catch (photoError) {
           console.error(
             "Failed to upload employee photo to ESSL system:",
