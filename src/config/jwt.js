@@ -51,6 +51,11 @@ const verifyAccessToken = (token) => {
   try {
     return jwt.verify(token, config.jwt.secret);
   } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      const customError = new Error("Access token has expired");
+      customError.eventKey = "ACCESS_TOKEN_EXPIRED";
+      throw customError;
+    }
     throw new Error("Invalid or expired token");
   }
 };
@@ -86,7 +91,11 @@ const findRefreshToken = async (token) => {
       where: { id: refreshToken.id },
       data: { revoked: true },
     });
-    throw new Error("Refresh token expired");
+
+    // Add specific event key for refresh token expiry
+    const error = new Error("Refresh token expired");
+    error.eventKey = "REFRESH_TOKEN_EXPIRED";
+    throw error;
   }
 
   return refreshToken;

@@ -10,13 +10,21 @@ class ApiError extends Error {
    * @param {string} message - Error message
    * @param {Object} errors - Validation errors
    * @param {boolean} isOperational - Is this an operational error
+   * @param {string} eventKey - Optional event key for specific error types
    */
-  constructor(statusCode, message, errors = {}, isOperational = true) {
+  constructor(
+    statusCode,
+    message,
+    errors = {},
+    isOperational = true,
+    eventKey = null
+  ) {
     super(message);
     this.statusCode = statusCode;
     this.errors = errors;
     this.isOperational = isOperational;
     this.status = `${statusCode}`.startsWith("4") ? "error" : "fail";
+    this.eventKey = eventKey;
 
     Error.captureStackTrace(this, this.constructor);
   }
@@ -35,10 +43,11 @@ const badRequest = (message = "Bad request", errors = {}) => {
 /**
  * Create an Unauthorized error (401)
  * @param {string} message - Error message
+ * @param {string} eventKey - Optional event key
  * @returns {ApiError} API error object
  */
-const unauthorized = (message = "Unauthorized") => {
-  return new ApiError(401, message);
+const unauthorized = (message = "Unauthorized", eventKey = null) => {
+  return new ApiError(401, message, {}, true, eventKey);
 };
 
 /**
@@ -100,15 +109,22 @@ const errorHandler = (err, req, res, next) => {
   if (!(error instanceof ApiError)) {
     const statusCode = error.statusCode || 500;
     const message = error.message || "Something went wrong";
-    error = new ApiError(statusCode, message, {}, false);
+    const eventKey = error.eventKey || null;
+    error = new ApiError(statusCode, message, {}, false, eventKey);
   }
 
-  res.status(error.statusCode).json({
+  const responseBody = {
     status: error.status,
     message: error.message,
     ...(process.env.NODE_ENV === "development" && { stack: error.stack }),
     ...(Object.keys(error.errors).length > 0 && { errors: error.errors }),
-  });
+  };
+
+  if (error.eventKey) {
+    responseBody.eventKey = error.eventKey;
+  }
+
+  res.status(error.statusCode).json(responseBody);
 };
 
 /**

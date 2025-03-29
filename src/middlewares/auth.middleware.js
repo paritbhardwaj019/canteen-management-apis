@@ -17,7 +17,20 @@ const authenticate = async (req, res, next) => {
     }
 
     const token = authHeader.split(" ")[1];
-    const decoded = verifyAccessToken(token);
+    let decoded;
+
+    try {
+      decoded = verifyAccessToken(token);
+    } catch (error) {
+      if (error.eventKey === "ACCESS_TOKEN_EXPIRED") {
+        return res.status(401).json({
+          status: "error",
+          message: "Access token has expired",
+          eventKey: "ACCESS_TOKEN_EXPIRED",
+        });
+      }
+      throw unauthorized("Invalid or expired token");
+    }
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
@@ -75,6 +88,15 @@ const authenticate = async (req, res, next) => {
 
     next();
   } catch (error) {
+    // Check if error has eventKey before generating response
+    if (error.eventKey) {
+      return res.status(401).json({
+        status: "error",
+        message: error.message || "Invalid or expired token",
+        eventKey: error.eventKey,
+      });
+    }
+
     return res.status(401).json({
       status: "error",
       message: error.message || "Invalid or expired token",
@@ -96,7 +118,21 @@ const optionalAuth = async (req, res, next) => {
     }
 
     const token = authHeader.split(" ")[1];
-    const decoded = verifyAccessToken(token);
+    let decoded;
+
+    try {
+      decoded = verifyAccessToken(token);
+    } catch (error) {
+      // If it's a token expiry, we still want to pass it to the client
+      // but continue as if there was no token
+      if (error.eventKey === "ACCESS_TOKEN_EXPIRED") {
+        res.locals.tokenError = {
+          message: "Access token has expired",
+          eventKey: "ACCESS_TOKEN_EXPIRED",
+        };
+      }
+      return next();
+    }
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
@@ -152,6 +188,10 @@ const optionalAuth = async (req, res, next) => {
 
     next();
   } catch (error) {
+    res.locals.tokenError = {
+      message: error.message || "Invalid token",
+      eventKey: error.eventKey,
+    };
     next();
   }
 };
