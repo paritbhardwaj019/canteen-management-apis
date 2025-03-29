@@ -157,7 +157,7 @@ const updateEmployee = async (employeeData) => {
     const {
       employeeCode,
       employeeName,
-      employeeLocation = "Chennai",
+      employeeLocation = "BHIMASAR",
       employeeRole = "Normal User",
       employeeVerificationType = "Finger or Face or Card or Password",
     } = employeeData;
@@ -400,13 +400,6 @@ const resetOpstamp = async (deviceSerialNumber) => {
   }
 };
 
-/**
- * Update an employee's face data in a specific device
- * @param {Object} faceData - Employee face enrollment data
- * @param {String} faceData.employeeCode - Employee number/code
- * @param {String} faceData.deviceSerialNumber - Serial number of the target device
- * @returns {Promise<String>} Face enrollment result
- */
 const updateEmployeeFaceInDevice = async (faceData) => {
   try {
     const { employeeCode, deviceSerialNumber } = faceData;
@@ -443,24 +436,51 @@ const updateEmployeeFaceInDevice = async (faceData) => {
       data: soapBody,
     });
 
-    console.log("Face enrollment response in device:", response.data);
+    console.log("Face enrollment raw response:", response.data);
 
-    const parser = new xml2js.Parser({ explicitArray: false });
+    const parser = new xml2js.Parser({
+      explicitArray: false,
+      ignoreAttrs: true,
+      trim: true,
+    });
+
     const result = await parser.parseStringPromise(response.data);
 
-    const enrollResult =
+    console.log(
+      "Parsed SOAP response structure:",
+      JSON.stringify(result, null, 2)
+    );
+
+    let enrollResult = "";
+
+    if (
+      result &&
+      result["soap:Envelope"] &&
+      result["soap:Envelope"]["soap:Body"] &&
       result["soap:Envelope"]["soap:Body"].DeviceCommand_EnrollFaceResponse
-        .DeviceCommand_EnrollFaceResult;
+    ) {
+      enrollResult =
+        result["soap:Envelope"]["soap:Body"].DeviceCommand_EnrollFaceResponse
+          .DeviceCommand_EnrollFaceResult || "";
+    } else {
+      console.warn("Unexpected response structure:", result);
+      if (
+        result &&
+        result["soap12:Envelope"] &&
+        result["soap12:Envelope"]["soap12:Body"] &&
+        result["soap12:Envelope"]["soap12:Body"]
+          .DeviceCommand_EnrollFaceResponse
+      ) {
+        enrollResult =
+          result["soap12:Envelope"]["soap12:Body"]
+            .DeviceCommand_EnrollFaceResponse.DeviceCommand_EnrollFaceResult ||
+          "";
+      }
+    }
 
     console.log("Face enrollment result in device:", enrollResult);
 
-    if (enrollResult && enrollResult.includes("success")) {
-      console.log("Face enrollment successful, resetting opstamp...");
-      const resetResult = await resetOpstamp(deviceSerialNumber);
-      console.log("Opstamp reset result:", resetResult);
-    }
-
-    return enrollResult;
+    return enrollResult || "No result returned from device";
   } catch (error) {
     console.error("Error enrolling employee face in device:", error);
     if (error.response) {
