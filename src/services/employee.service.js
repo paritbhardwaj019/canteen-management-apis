@@ -78,7 +78,7 @@ const createEmployee = async (
   } = employeeData;
 
   const {
-    location = 1,
+    location = "BHIMASAR",
     role = "Normal User",
     verificationType = "Finger or Face or Card or Password",
     photoBase64,
@@ -512,7 +512,7 @@ const updateEmployee = async (
   } = employeeData;
 
   const {
-    location = "1",
+    location = "BHIMASAR",
     role = "Employee",
     verificationType = "Card",
     photoBase64,
@@ -674,7 +674,7 @@ const updateEmployee = async (
  */
 const registerEmployeeInEssl = async (id, esslOptions = {}) => {
   const {
-    location = "1",
+    location = "BHIMASAR",
     role = "Employee",
     verificationType = "Card",
     photoBase64,

@@ -379,6 +379,8 @@ const resetOpstamp = async (deviceSerialNumber) => {
       data: soapBody,
     });
 
+    console.log("RESETTING DEVICE OPSTAMP", response.data);
+
     const parser = new xml2js.Parser({ explicitArray: false });
     const result = await parser.parseStringPromise(response.data);
 
