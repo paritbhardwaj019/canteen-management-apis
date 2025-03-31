@@ -36,7 +36,7 @@ router.get(
 
 router.get(
   "/:id",
-  checkRole(["Super Admin", "Plant Head", "HR"]),
+  checkRole(["Super Admin", "Plant Head", "HR", "Employee"]),
   employeeController.getEmployeeById
 );
 
