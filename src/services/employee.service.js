@@ -479,7 +479,7 @@ const getEmployeeByEmployeeNo = async (employeeNo) => {
 const updateEmployee = async (
   id,
   employeeData,
-  updateInEssl = false,
+  updateInEssl = true,
   esslOptions = {}
 ) => {
   const {
@@ -569,8 +569,8 @@ const updateEmployee = async (
   });
 
   let esslUpdateResult = null;
+  let esslDeviceUpdateResult = null;
   let esslPhotoResult = null;
-  let esslFaceEnrollmentResult = null;
   let esslResetOpstampResult = null;
 
   if (updateInEssl) {
@@ -587,52 +587,42 @@ const updateEmployee = async (
         employeeVerificationType: verificationType,
       });
 
-      let updateSuccess =
+      const updateSuccess =
         esslUpdateResult && esslUpdateResult.includes("success");
 
-      if (updateSuccess && photoBase64) {
-        try {
+      if (updateSuccess) {
+        console.log("Updating employee in device");
+        esslDeviceUpdateResult = await esslService.updateEmployeeFaceInDevice({
+          employeeCode: updatedEmployeeNo,
+          deviceSerialNumber: config.essl.deviceSerialNumber,
+        });
+        console.log(
+          "Device update completed with result:",
+          esslDeviceUpdateResult
+        );
+
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        if (photoBase64) {
+          console.log("Updating employee photo");
           esslPhotoResult = await esslService.updateEmployeePhoto({
             employeeCode: updatedEmployeeNo,
             employeePhoto: photoBase64,
           });
+          console.log("Photo update completed with result:", esslPhotoResult);
 
-          if (esslPhotoResult && esslPhotoResult.includes("success")) {
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-
-            console.log(
-              "Calling updateEmployeeFaceInDevice after 1-second delay"
-            );
-            esslFaceEnrollmentResult =
-              await esslService.updateEmployeeFaceInDevice({
-                employeeCode: updatedEmployeeNo,
-                deviceSerialNumber: config.essl.deviceSerialNumber,
-              });
-            console.log(
-              "Face enrollment completed with result:",
-              esslFaceEnrollmentResult
-            );
-
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-
-            console.log("Calling resetOpstamp after 1-second delay");
-            esslResetOpstampResult = await esslService.resetOpstamp(
-              config.essl.deviceSerialNumber
-            );
-            console.log(
-              "OpStamp reset completed with result:",
-              esslResetOpstampResult
-            );
-          }
-        } catch (photoError) {
-          console.error(
-            "Failed to update employee photo in ESSL system:",
-            photoError
-          );
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
-      }
 
-      if (updateSuccess) {
+        console.log("Resetting OpStamp");
+        esslResetOpstampResult = await esslService.resetOpstamp(
+          config.essl.deviceSerialNumber
+        );
+        console.log(
+          "OpStamp reset completed with result:",
+          esslResetOpstampResult
+        );
+
         await prisma.employee.update({
           where: { id: result.employee.id },
           data: { isEsslRegistered: true },
@@ -640,10 +630,11 @@ const updateEmployee = async (
         result.employee.isEsslRegistered = true;
       }
     } catch (error) {
-      console.error("Failed to update employee in ESSL system:", error);
+      console.error("Failed to complete ESSL operations:", error);
     }
   }
 
+  // 4. Prepare and return final result
   const resultPhotoUrl =
     result.photos && result.photos.length > 0 ? result.photos[0].url : null;
 
@@ -662,8 +653,8 @@ const updateEmployee = async (
     photoUrl: resultPhotoUrl,
     updatedAt: result.employee.updatedAt,
     esslUpdateResult: esslUpdateResult,
+    esslDeviceUpdateResult: esslDeviceUpdateResult,
     esslPhotoResult: esslPhotoResult,
-    esslFaceEnrollmentResult: esslFaceEnrollmentResult,
     esslResetOpstampResult: esslResetOpstampResult,
   };
 };
