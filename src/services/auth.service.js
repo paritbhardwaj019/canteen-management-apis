@@ -220,7 +220,6 @@ const login = async (credentials) => {
         role: {
           include: {
             permissions: true,
-          
           },
         },
         employee: true,
@@ -233,7 +232,6 @@ const login = async (credentials) => {
         role: {
           include: {
             permissions: true,
-          
           },
         },
         employee: true,
@@ -249,7 +247,6 @@ const login = async (credentials) => {
               role: {
                 include: {
                   permissions: true,
-                 
                 },
               },
             },

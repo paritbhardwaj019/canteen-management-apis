@@ -1325,19 +1325,91 @@ const bulkCreateEmployees = async (
 };
 
 /**
- * Replace spaces in employee emails with underscores
- * @returns {Promise} Promise that resolves when the operation is complete
+ * Remove spaces from employee emails and update associated user emails.
+ * Returns a summary of the operation.
+ * @returns {Promise<object>} Promise that resolves with an object summarizing the operation.
  */
 const replaceSpacesInEmails = async () => {
-  const employees = await prisma.employee.findMany();
+  let processedCount = 0;
+  let successfullyUpdatedCount = 0;
+  let skippedCount = 0;
+  let failureCount = 0;
+  const errors = [];
+
+  const employees = await prisma.employee.findMany({
+    select: {
+      id: true,
+      email: true,
+      userId: true,
+    },
+  });
+
+  console.log(`Found ${employees.length} employees to potentially process.`);
 
   for (const employee of employees) {
-    const newEmail = employee.email.replace(/\s+/g, "_");
-    await prisma.employee.update({
-      where: { id: employee.id },
-      data: { email: newEmail },
-    });
+    processedCount++;
+
+    if (employee.email && /\s/.test(employee.email)) {
+      const originalEmail = employee.email;
+      const newEmail = originalEmail.replace(/\s+/g, "");
+
+      try {
+        await prisma.$transaction(async (tx) => {
+          await tx.employee.update({
+            where: { id: employee.id },
+            data: { email: newEmail },
+          });
+
+          if (employee.userId) {
+            await tx.user.update({
+              where: { id: employee.userId },
+              data: { email: newEmail },
+            });
+          } else {
+            console.warn(
+              `User update skipped for employee ${employee.id} due to missing userId.`
+            );
+          }
+        });
+        successfullyUpdatedCount++;
+      } catch (error) {
+        failureCount++;
+        const errorDetails = {
+          employeeId: employee.id,
+          userId: employee.userId,
+          originalEmail: originalEmail,
+          attemptedEmail: newEmail,
+          errorCode: error.code,
+          errorMessage: error.message,
+        };
+        errors.push(errorDetails);
+        console.error(
+          `Error updating email for employee ID: ${employee.id} (User ID: ${employee.userId}). Error:`,
+          error.message
+        );
+        if (error.code === "P2002") {
+          console.error(
+            `  Failed due to unique constraint violation on email "${newEmail}".`
+          );
+        }
+      }
+    } else {
+      skippedCount++;
+    }
   }
+
+  console.log("Finished processing employee emails.");
+
+  const summary = {
+    totalEmployeesChecked: employees.length,
+    successfullyUpdated: successfullyUpdatedCount,
+    skippedNoUpdateNeeded: skippedCount,
+    failedUpdates: failureCount,
+    errors: errors,
+  };
+
+  console.log("Operation Summary:", summary);
+  return summary;
 };
 
 module.exports = {
