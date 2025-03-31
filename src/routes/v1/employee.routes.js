@@ -35,6 +35,12 @@ router.get(
 );
 
 router.get(
+  "/department/:department",
+  checkRole(["Super Admin", "Plant Head", "HR"]),
+  employeeController.getEmployeesByDepartment
+);
+
+router.get(
   "/:id",
   checkRole(["Super Admin", "Plant Head", "HR", "Employee"]),
   employeeController.getEmployeeById
@@ -70,22 +76,10 @@ router.post(
   employeeController.uploadEmployeePhoto
 );
 
-router.get(
-  "/department/:department",
-  checkRole(["Super Admin", "Plant Head", "HR"]),
-  employeeController.getEmployeesByDepartment
-);
-
 router.put(
   "/disable/:id",
   checkRole(["Super Admin", "Plant Head", "HR"]),
   employeeController.disableEmployee
 );
-
-// router.post(
-//   "/import-from-essl",
-//   checkRole(["Super Admin"]),
-//   employeeController.importEmployeeFromEssl
-// );
 
 module.exports = router;
