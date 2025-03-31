@@ -14,6 +14,12 @@ const {
 
 router.use(authenticate);
 
+router.get(
+  "/replace-spaces-in-emails",
+  checkRole(["Super Admin"]),
+  employeeController.replaceSpacesInEmails
+);
+
 router.post(
   "/bulk-upload",
   checkRole(["Super Admin", "Plant Head", "HR"]),

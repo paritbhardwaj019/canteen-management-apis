@@ -487,6 +487,14 @@ const bulkUploadEmployees = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Replace spaces in employee emails with underscores
+ */
+const replaceSpacesInEmails = asyncHandler(async (req, res) => {
+  await employeeService.replaceSpacesInEmails();
+  return ApiResponse.ok(res, "Spaces replaced successfully");
+});
+
 module.exports = {
   registerEmployee,
   uploadEmployeePhoto,
@@ -499,4 +507,5 @@ module.exports = {
   updateEmployeePhotoInEssl,
   disableEmployee,
   bulkUploadEmployees,
+  replaceSpacesInEmails,
 };

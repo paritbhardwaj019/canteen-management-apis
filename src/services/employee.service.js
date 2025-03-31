@@ -1324,6 +1324,22 @@ const bulkCreateEmployees = async (
   return results;
 };
 
+/**
+ * Replace spaces in employee emails with underscores
+ * @returns {Promise} Promise that resolves when the operation is complete
+ */
+const replaceSpacesInEmails = async () => {
+  const employees = await prisma.employee.findMany();
+
+  for (const employee of employees) {
+    const newEmail = employee.email.replace(/\s+/g, "_");
+    await prisma.employee.update({
+      where: { id: employee.id },
+      data: { email: newEmail },
+    });
+  }
+};
+
 module.exports = {
   createEmployee,
   addEmployeePhoto,
@@ -1340,4 +1356,5 @@ module.exports = {
   disableEmployee,
   updateEmployeePhotoInEssl,
   bulkCreateEmployees,
+  replaceSpacesInEmails,
 };
