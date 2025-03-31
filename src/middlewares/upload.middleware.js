@@ -3,6 +3,7 @@ const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const config = require("../config/config");
 const { badRequest } = require("../utils/api.error");
+const path = require("path");
 
 cloudinary.config({
   cloud_name: config.cloudinary.cloud_name,
@@ -28,6 +29,8 @@ const imageStorage = createCloudinaryStorage("employee/images", [
   "png",
 ]);
 const documentStorage = createCloudinaryStorage("employee/documents", ["pdf"]);
+
+const excelStorage = multer.memoryStorage();
 
 const imageUpload = multer({
   storage: imageStorage,
@@ -55,6 +58,29 @@ const documentUpload = multer({
       return cb(badRequest("Only PDF document files are allowed"), false);
     }
     cb(null, true);
+  },
+});
+
+const excelUpload = multer({
+  storage: excelStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+  },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const mimeType = file.mimetype;
+
+    if (
+      ext === ".xlsx" ||
+      ext === ".xls" ||
+      mimeType ===
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+      mimeType === "application/vnd.ms-excel"
+    ) {
+      cb(null, true);
+    } else {
+      cb(badRequest("Only Excel files (.xlsx, .xls) are allowed"), false);
+    }
   },
 });
 
@@ -96,16 +122,11 @@ const deleteFile = async (publicId) => {
 
 module.exports = {
   uploadEmployeePhoto: imageUpload.single("photo"),
-
   uploadEmployeeDocument: documentUpload.single("document"),
-
   uploadMultipleEmployeePhotos: imageUpload.array("photos", 5),
-
   uploadVisitorPhoto: imageUpload.single("photo"),
-
+  uploadExcelFile: excelUpload.single("file"),
   handleMulterError,
-
   deleteFile,
-
   cloudinary,
 };

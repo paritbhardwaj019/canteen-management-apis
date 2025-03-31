@@ -9,9 +9,18 @@ const {
 const {
   uploadEmployeePhoto,
   handleMulterError,
+  uploadExcelFile,
 } = require("../../middlewares/upload.middleware");
 
 router.use(authenticate);
+
+router.post(
+  "/bulk-upload",
+  checkRole(["Super Admin", "Plant Head", "HR"]),
+  uploadExcelFile,
+  handleMulterError,
+  employeeController.bulkUploadEmployees
+);
 
 router.get(
   "/",
@@ -35,7 +44,9 @@ router.post(
 
 router.put(
   "/:id",
-  checkRole(["Super Admin", "Plant Head", "HR"]),
+  checkRole(["Super Admin", "Plant Head", "HR", "Employee"]),
+  uploadEmployeePhoto,
+  handleMulterError,
   employeeController.updateEmployee
 );
 
@@ -45,13 +56,13 @@ router.delete(
   employeeController.deleteEmployee
 );
 
-// router.post(
-//   "/:id/photo",
-//   checkRole(["Super Admin", "Plant Head", "HR"]),
-//   uploadEmployeePhoto,
-//   handleMulterError,
-//   employeeController.uploadEmployeePhoto
-// );
+router.post(
+  "/:id/photo",
+  checkRole(["Super Admin", "Plant Head", "HR"]),
+  uploadEmployeePhoto,
+  handleMulterError,
+  employeeController.uploadEmployeePhoto
+);
 
 router.get(
   "/department/:department",

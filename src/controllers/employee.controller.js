@@ -2,6 +2,7 @@ const employeeService = require("../services/employee.service");
 const asyncHandler = require("../utils/async.handler");
 const { badRequest } = require("../utils/api.error");
 const ApiResponse = require("../utils/api.response");
+const config = require("../config/config");
 
 /**
  * Register a new employee
@@ -186,18 +187,39 @@ const updateEmployee = asyncHandler(async (req, res) => {
     department,
     designation,
     isActive,
-    updateInEssl,
+    updateInEssl = true,
     esslLocation,
     esslRole,
     esslVerificationType,
-    photoBase64,
   } = req.body;
+
+  let photoUrl = null;
+  let photoBase64 = null;
+
+  if (req.file) {
+    photoUrl = req.file.path;
+
+    if (updateInEssl) {
+      try {
+        const axios = require("axios");
+        const response = await axios.get(photoUrl, {
+          responseType: "arraybuffer",
+        });
+        const buffer = Buffer.from(response.data, "binary");
+        const mimeType = req.file.mimetype || "image/jpeg";
+        photoBase64 = `${buffer.toString("base64")}`;
+      } catch (error) {
+        console.error("Error converting Cloudinary image to base64:", error);
+      }
+    }
+  }
 
   const esslOptions = updateInEssl
     ? {
-        location: esslLocation,
-        role: esslRole,
-        verificationType: esslVerificationType,
+        location: esslLocation || config.essl.deviceLocation,
+        role: esslRole || "Normal User",
+        verificationType:
+          esslVerificationType || "Finger or Face or Card or Password",
         photoBase64,
       }
     : {};
@@ -212,6 +234,7 @@ const updateEmployee = asyncHandler(async (req, res) => {
       department,
       designation,
       isActive,
+      photoUrl,
     },
     updateInEssl,
     esslOptions
@@ -231,11 +254,12 @@ const updateEmployee = asyncHandler(async (req, res) => {
               : "ESSL update failed",
           details: updatedEmployee.esslUpdateResult,
           photoDetails: updatedEmployee.esslPhotoResult,
+          faceEnrollmentDetails: updatedEmployee.esslFaceEnrollmentResult,
+          resetOpstampDetails: updatedEmployee.esslResetOpstampResult,
         }
       : null,
   });
 });
-
 /**
  * Register an employee in ESSL system
  */
@@ -267,7 +291,7 @@ const updateEmployeePhotoInEssl = asyncHandler(async (req, res) => {
   const result = await employeeService.updateEmployeePhotoInEssl(
     id,
     photoBase64,
-    "TFEE240900455"
+    config.essl.deviceSerialNumber
   );
 
   return ApiResponse.ok(res, result.message, result);
@@ -337,6 +361,132 @@ const disableEmployee = asyncHandler(async (req, res) => {
   return ApiResponse.ok(res, "Employee disabled successfully", employee);
 });
 
+/**
+ * Bulk upload employees from Excel file
+ * Adds employees to both the application database and ESSL system
+ */
+const bulkUploadEmployees = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    throw badRequest("Excel file is required");
+  }
+
+  const {
+    registerInEssl = true,
+    esslLocation,
+    esslRole,
+    esslVerificationType,
+  } = req.body;
+
+  const fileBuffer = req.file.buffer;
+
+  const XLSX = require("xlsx");
+  const workbook = XLSX.read(fileBuffer, { type: "buffer" });
+
+  const sheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[sheetName];
+
+  const employeesData = XLSX.utils.sheet_to_json(worksheet);
+
+  if (!employeesData || employeesData.length === 0) {
+    throw badRequest("No employee data found in the Excel file");
+  }
+
+  const mappedEmployees = employeesData.map((row) => {
+    const nameField =
+      row.name ||
+      row.Name ||
+      row.fullName ||
+      row["Full Name"] ||
+      row.FullName ||
+      row.employee_name ||
+      row.employeeName;
+
+    let firstName =
+      row.firstName || row["First Name"] || row["first_name"] || "";
+    let lastName = row.lastName || row["Last Name"] || row["last_name"] || "";
+
+    if ((!firstName || !lastName) && nameField) {
+      if (typeof nameField === "string") {
+        if (nameField.includes(".")) {
+          const parts = nameField.split(".");
+          firstName = parts[0] || "";
+          lastName = parts.slice(1).join(".") || "-";
+        } else if (nameField.includes(" ")) {
+          const parts = nameField.split(" ");
+          firstName = parts[0] || "";
+          lastName = parts.slice(1).join(" ") || "-";
+        } else {
+          firstName = nameField;
+          lastName = "-";
+        }
+      }
+    }
+
+    return {
+      name: nameField,
+      firstName: firstName,
+      lastName: lastName,
+      employeeNo:
+        row.employee_code ||
+        row["Employee Code"] ||
+        row["employee_code"] ||
+        row.employeeNo ||
+        row["Employee No"] ||
+        row["employee_no"] ||
+        row["Employee Number"] ||
+        row["emp_code"] ||
+        row["EmpCode"] ||
+        row["Code"] ||
+        "",
+      email: row.email || row["Email"] || row["email_id"] || "",
+      department: row.department || row["Department"] || row["dept"] || "",
+      designation:
+        row.designation ||
+        row["Designation"] ||
+        row["Position"] ||
+        row["JobTitle"] ||
+        row["job_title"] ||
+        "",
+      password: row.password || row["Password"] || "password123",
+    };
+  });
+
+  if (mappedEmployees.length > 0) {
+    console.log("First mapped employee:", mappedEmployees[0]);
+  }
+
+  const esslOptions = registerInEssl
+    ? {
+        location: esslLocation,
+        role: esslRole,
+        verificationType: esslVerificationType,
+      }
+    : {};
+
+  const results = await employeeService.bulkCreateEmployees(
+    mappedEmployees,
+    registerInEssl,
+    esslOptions
+  );
+
+  return ApiResponse.created(res, "Bulk employee upload processed", {
+    summary: {
+      total: results.total,
+      successful: results.successful,
+      failed: results.failed,
+    },
+    employees: results.employees,
+    errors: results.errors,
+    esslRegistration: registerInEssl
+      ? {
+          employeesRegistered: results.successful,
+          stampResetResult:
+            results.esslResetResult || "Operation stamp reset attempted",
+        }
+      : null,
+  });
+});
+
 module.exports = {
   registerEmployee,
   uploadEmployeePhoto,
@@ -348,4 +498,5 @@ module.exports = {
   registerEmployeeInEssl,
   updateEmployeePhotoInEssl,
   disableEmployee,
+  bulkUploadEmployees,
 };

@@ -279,9 +279,7 @@ const getAllEmployees = async (options) => {
     ];
   }
 
-  // Count total employees matching criteria
   const totalCount = await prisma.employee.count({ where });
-  // where.isActive = true;
   where.user = { isActive: true };
 
   // Get employees with pagination
@@ -493,11 +491,12 @@ const updateEmployee = async (
     designation,
     isActive,
     isEsslRegistered,
+    photoUrl,
   } = employeeData;
 
   const {
     location = config.essl.deviceLocation,
-    role = "Employee",
+    role = "Normal User",
     verificationType = "Finger or Face or Card or Password",
     photoBase64,
   } = esslOptions;
@@ -514,7 +513,6 @@ const updateEmployee = async (
     throw notFound("Employee not found");
   }
 
-  // If changing employee number, check if it's unique
   if (employeeNo && employeeNo !== employee.employeeNo) {
     const existingEmployee = await prisma.employee.findUnique({
       where: { employeeNo },
@@ -527,9 +525,7 @@ const updateEmployee = async (
     }
   }
 
-  // Update user and employee in transaction
   const result = await prisma.$transaction(async (prisma) => {
-    // Update user information
     const user = await prisma.user.update({
       where: { id: employee.userId },
       data: {
@@ -544,7 +540,6 @@ const updateEmployee = async (
       },
     });
 
-    // Update employee information
     const updatedEmployee = await prisma.employee.update({
       where: { id },
       data: {
@@ -559,16 +554,27 @@ const updateEmployee = async (
       },
     });
 
-    return { employee: updatedEmployee, user };
+    let photos = updatedEmployee.photos || [];
+    if (photoUrl) {
+      const photo = await prisma.employeePhoto.create({
+        data: {
+          url: photoUrl,
+          employeeId: updatedEmployee.id,
+        },
+      });
+      photos = [photo, ...photos];
+    }
+
+    return { employee: updatedEmployee, user, photos };
   });
 
-  // Update employee in ESSL system if requested
   let esslUpdateResult = null;
   let esslPhotoResult = null;
+  let esslFaceEnrollmentResult = null;
+  let esslResetOpstampResult = null;
 
   if (updateInEssl) {
     try {
-      // Use the most up-to-date data for ESSL update
       const updatedEmployeeNo = employeeNo || employee.employeeNo;
       const updatedFirstName = firstName || result.user.firstName;
       const updatedLastName = lastName || result.user.lastName;
@@ -581,7 +587,6 @@ const updateEmployee = async (
         employeeVerificationType: verificationType,
       });
 
-      // If update was successful and photo was provided, update the photo too
       let updateSuccess =
         esslUpdateResult && esslUpdateResult.includes("success");
 
@@ -592,22 +597,41 @@ const updateEmployee = async (
             employeePhoto: photoBase64,
           });
 
-          // Log but don't fail if photo upload fails
-          if (!esslPhotoResult || !esslPhotoResult.includes("success")) {
-            console.warn(
-              `ESSL photo upload succeeded but returned unexpected result: ${esslPhotoResult}`
+          if (esslPhotoResult && esslPhotoResult.includes("success")) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            console.log(
+              "Calling updateEmployeeFaceInDevice after 1-second delay"
+            );
+            esslFaceEnrollmentResult =
+              await esslService.updateEmployeeFaceInDevice({
+                employeeCode: updatedEmployeeNo,
+                deviceSerialNumber: config.essl.deviceSerialNumber,
+              });
+            console.log(
+              "Face enrollment completed with result:",
+              esslFaceEnrollmentResult
+            );
+
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            console.log("Calling resetOpstamp after 1-second delay");
+            esslResetOpstampResult = await esslService.resetOpstamp(
+              config.essl.deviceSerialNumber
+            );
+            console.log(
+              "OpStamp reset completed with result:",
+              esslResetOpstampResult
             );
           }
         } catch (photoError) {
           console.error(
-            "Failed to upload employee photo to ESSL system:",
+            "Failed to update employee photo in ESSL system:",
             photoError
           );
-          // Continue even if photo upload fails
         }
       }
 
-      // If update was successful, ensure the employee's ESSL registration status is true
       if (updateSuccess) {
         await prisma.employee.update({
           where: { id: result.employee.id },
@@ -617,15 +641,11 @@ const updateEmployee = async (
       }
     } catch (error) {
       console.error("Failed to update employee in ESSL system:", error);
-      // Continue with employee update even if ESSL update fails
     }
   }
 
-  // Get the first photo URL if available
-  const photoUrl =
-    result.employee.photos && result.employee.photos.length > 0
-      ? result.employee.photos[0].url
-      : null;
+  const resultPhotoUrl =
+    result.photos && result.photos.length > 0 ? result.photos[0].url : null;
 
   return {
     id: result.employee.id,
@@ -638,11 +658,13 @@ const updateEmployee = async (
     designation: result.employee.designation,
     isActive: result.user.isActive,
     isEsslRegistered: result.employee.isEsslRegistered,
-    photos: result.employee.photos,
-    photoUrl: photoUrl,
+    photos: result.photos,
+    photoUrl: resultPhotoUrl,
     updatedAt: result.employee.updatedAt,
     esslUpdateResult: esslUpdateResult,
     esslPhotoResult: esslPhotoResult,
+    esslFaceEnrollmentResult: esslFaceEnrollmentResult,
+    esslResetOpstampResult: esslResetOpstampResult,
   };
 };
 
@@ -1167,6 +1189,141 @@ const addEmployeePhoto = async (employeeId, photoUrl) => {
   return photo;
 };
 
+/**
+ * Bulk create employees from Excel file data
+ * @param {Array} employeesData - Array of employee data from Excel
+ * @param {Boolean} registerInEssl - Whether to register employees in ESSL system
+ * @param {Object} esslOptions - ESSL registration options
+ * @returns {Object} Results of bulk creation
+ */
+const bulkCreateEmployees = async (
+  employeesData,
+  registerInEssl = true,
+  esslOptions = {}
+) => {
+  const results = {
+    total: employeesData.length,
+    successful: 0,
+    failed: 0,
+    employees: [],
+    errors: [],
+  };
+
+  const {
+    location = config.essl.deviceLocation,
+    role = "Normal User",
+    verificationType = "Finger or Face or Card or Password",
+  } = esslOptions;
+
+  for (const empData of employeesData) {
+    try {
+      let firstName = empData.firstName;
+      let lastName = empData.lastName;
+
+      if ((!firstName || !lastName) && empData.name) {
+        const nameParts = empData.name.split(".");
+
+        if (nameParts.length >= 2) {
+          firstName = nameParts[0];
+          lastName = nameParts.slice(1).join(".");
+        } else {
+          const spaceNameParts = empData.name.split(" ");
+          if (spaceNameParts.length >= 2) {
+            firstName = spaceNameParts[0];
+            lastName = spaceNameParts.slice(1).join(" ");
+          } else {
+            firstName = empData.name;
+            lastName = "-";
+          }
+        }
+      }
+
+      const employeeNo = empData.employeeNo ? String(empData.employeeNo) : null;
+
+      if (!firstName || !lastName || !employeeNo) {
+        results.failed++;
+        results.errors.push({
+          employeeNo: employeeNo || "Unknown",
+          name: empData.name || "",
+          error: "Missing required fields (firstName, lastName, or employeeNo)",
+          data: JSON.stringify(empData),
+        });
+        continue;
+      }
+
+      const existingEmployee = await prisma.employee.findUnique({
+        where: { employeeNo },
+      });
+
+      if (existingEmployee) {
+        results.failed++;
+        results.errors.push({
+          employeeNo,
+          error: `Employee with employee number ${employeeNo} already exists`,
+        });
+        continue;
+      }
+
+      const password = empData.password || "password123";
+
+      const email = empData.email ? String(empData.email) : null;
+      const department = empData.department ? String(empData.department) : null;
+      const designation = empData.designation
+        ? String(empData.designation)
+        : null;
+
+      const newEmployee = await createEmployee(
+        {
+          email,
+          firstName,
+          lastName,
+          employeeNo,
+          department,
+          designation,
+          password,
+        },
+        registerInEssl,
+        {
+          location: location,
+          role: role,
+          verificationType: verificationType,
+        }
+      );
+
+      results.successful++;
+      results.employees.push({
+        id: newEmployee.id,
+        employeeNo: newEmployee.employeeNo,
+        name: `${newEmployee.firstName} ${newEmployee.lastName}`,
+        isEsslRegistered: newEmployee.isEsslRegistered,
+        esslRegistrationResult: newEmployee.esslRegistrationResult,
+      });
+    } catch (error) {
+      console.error(`Error creating employee ${empData.employeeNo}:`, error);
+      results.failed++;
+      results.errors.push({
+        employeeNo: empData.employeeNo ? String(empData.employeeNo) : "Unknown",
+        error: error.message,
+      });
+    }
+  }
+
+  // if (registerInEssl && results.successful > 0) {
+  //   try {
+  //     const resetResult = await esslService.resetOpstamp(
+  //       config.essl.deviceSerialNumber
+  //     );
+  //     console.log("OpStamp reset completed with result:", resetResult);
+  //     results.esslResetResult = resetResult;
+  //   } catch (error) {
+  //     console.error("Failed to reset OpStamp after bulk upload:", error);
+  //     results.esslResetError = error.message;
+  //   }
+  // }
+
+  return results;
+};
+
 module.exports = {
   createEmployee,
   addEmployeePhoto,
@@ -1182,4 +1339,5 @@ module.exports = {
   registerEmployeeInEssl,
   disableEmployee,
   updateEmployeePhotoInEssl,
+  bulkCreateEmployees,
 };
