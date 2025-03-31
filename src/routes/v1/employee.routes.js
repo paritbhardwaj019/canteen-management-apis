@@ -50,7 +50,7 @@ router.post(
 
 router.put(
   "/:id",
-  checkRole(["Super Admin", "Plant Head", "HR", "Employee"]),
+  authenticate,
   uploadEmployeePhoto,
   handleMulterError,
   employeeController.updateEmployee
