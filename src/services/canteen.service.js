@@ -386,7 +386,6 @@ const getCanteenReport = async (loggedInUser, filters = {}) => {
   let entries = await prisma.canteenEntry.findMany({
     where: {
       logTime: dateFilter,
-      status: "APPROVED",
     },
     include: {
       plant: {
@@ -468,7 +467,6 @@ const getMonthlyReport = async (loggedInUser, filters = {}) => {
           gte: fromDate,
           lte: toDate,
         },
-        status: "APPROVED",
       },
       include: {
         plant: {
