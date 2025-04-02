@@ -1,6 +1,7 @@
 const cron = require("node-cron");
 const { getDeviceLogs } = require("./essl.service");
 const { PrismaClient } = require("@prisma/client");
+const { parseLogTime } = require("./canteen.service");
 const prisma = new PrismaClient();
 
 /**
@@ -51,7 +52,7 @@ const syncCanteenEntries = async () => {
         const existingEntry = await prisma.canteenEntry.findFirst({
           where: {
             employeeId: employee.id,
-            logTime: new Date(logTime),
+            logTime: new Date(parseLogTime(logTime)),
           },
         });
 
@@ -60,7 +61,7 @@ const syncCanteenEntries = async () => {
             data: {
               employeeId: employee.id,
               status: "PENDING",
-              logTime: new Date(logTime),
+              logTime: new Date(parseLogTime(logTime)),
               location: logLocation?.toString() || locationType,
               plantId: employee.user?.plantId,
             },
@@ -86,7 +87,7 @@ const syncCanteenEntries = async () => {
  * Set up scheduled tasks
  */
 const setupCronJobs = () => {
-  cron.schedule("*/5 * * * *", () => {
+  cron.schedule("* * * * * *", () => {
     console.log("Running canteen entry sync job...");
     syncCanteenEntries();
   });

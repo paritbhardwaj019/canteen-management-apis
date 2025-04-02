@@ -60,6 +60,7 @@ model Employee {
   userId           String          @unique
   employeeNo       String          @unique
   email            String?
+  contact          String?        
   department       String?
   designation      String?
   isEsslRegistered Boolean         @default(false)

@@ -3,6 +3,7 @@ const prisma = new PrismaClient();
 const { getDeviceLogs } = require("../services/essl.service");
 const { badRequest } = require("../utils/api.error");
 const { getCanteenReportColumns } = require("../utils/columnModles");
+const { convertToIST } = require("../utils/dateUtils");
 
 /**
  * Parse logTime string into a valid Date object
@@ -55,6 +56,8 @@ const getCanteenEntryColumns = (role) => {
  */
 const formatEntryData = (entry) => {
   const { employee, ...entryData } = entry;
+
+  console.log("ENTRY", entry);
 
   const photoUrl =
     employee?.photos && employee.photos.length > 0
@@ -109,6 +112,8 @@ const processLocationLogs = async (date, locationType) => {
         }
 
         const parsedLogTime = parseLogTime(log.logTime);
+        console.log(parsedLogTime, "PARSED LOG TIME");
+
         if (!parsedLogTime) {
           console.warn(`Invalid logTime for user ${log.user}: ${log.logTime}`);
           return null;
@@ -404,6 +409,7 @@ const getCanteenReport = async (loggedInUser, filters = {}) => {
               email: true,
             },
           },
+          contact: true,
         },
       },
     },
@@ -411,22 +417,45 @@ const getCanteenReport = async (loggedInUser, filters = {}) => {
 
   const meals = await prisma.menu.findMany({});
 
-  entries = entries.map((entry) => ({
-    ...entry,
-    plantName: entry.plant?.name,
-    plantCode: entry.plant?.plantCode,
-    date: entry.logTime.toISOString().split("T")[0],
-    employeeNo: entry.employee.employeeNo,
-    employeeName:
-      entry.employee.user.firstName + " " + entry.employee.user.lastName,
-    logTime: entry.logTime.toISOString().split("T")[0],
-    quantity: 1,
-    employerContribution: meals[0].emrContribution,
-    employeeContribution: meals[0].empContribution,
-    price: meals[0].price,
-    meal: meals[0].name,
-    mealType: meals[0].type,
-  }));
+  entries = entries.map((entry) => {
+    const entryTimeIST = convertToIST(entry.logTime);
+
+    const timeObj = new Date(entryTimeIST);
+    const hours = timeObj.getHours();
+    const minutes = timeObj.getMinutes();
+    const timeInMinutes = hours * 60 + minutes;
+
+    let shift = null;
+    let remark = null;
+
+    if (timeInMinutes >= 720 && timeInMinutes <= 840) {
+      shift = "A";
+      remark = "LUNCH";
+    } else if (timeInMinutes >= 1200 && timeInMinutes <= 1320) {
+      shift = "B";
+      remark = "DINNER";
+    }
+
+    return {
+      ...entry,
+      plantName: entry.plant?.name,
+      plantCode: entry.plant?.plantCode,
+      date: entry.logTime.toISOString().split("T")[0],
+      employeeNo: entry.employee.employeeNo,
+      employeeName:
+        entry.employee.user.firstName + " " + entry.employee.user.lastName,
+      inTime: entryTimeIST,
+      quantity: 1,
+      employerContribution: meals[0].emrContribution,
+      employeeContribution: meals[0].empContribution,
+      price: meals[0].price,
+      meal: meals[0].name,
+      mealType: meals[0].type,
+      contact: entry.employee.contact,
+      shift: shift,
+      remark: remark,
+    };
+  });
 
   return { entries, columns: getCanteenReportColumns() };
 };
@@ -583,4 +612,5 @@ module.exports = {
   approveEntry,
   getCanteenReport,
   getMonthlyReport,
+  parseLogTime,
 };

@@ -22,7 +22,8 @@
     "docker:logs": "docker-compose logs -f app",
     "docker:mysql": "docker-compose exec mysql mysql -u canteen -pcanteenpassword canteen",
     "docker:restart": "docker-compose restart",
-    "test": "jest --detectOpenHandles"
+    "test": "jest --detectOpenHandles",
+    "update-employee-contacts": "node migrations/2025_03_02_update_employee_contacts.js"
   },
   "keywords": [
     "canteen",

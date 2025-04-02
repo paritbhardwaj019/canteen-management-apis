@@ -52,7 +52,7 @@ const getMealRequestColumns = (userRole) => {
     { field: "plantCode", headerName: "Plant Code", width: 150 },
     { field: "quantity", headerName: "Quantity", width: 100 },
     { field: "totalPrice", headerName: "Total Price", width: 150 },
-    { field: "name", headerName: "Employee Name", width: 150 }, 
+    { field: "name", headerName: "Employee Name", width: 150 },
     { field: "menuName", headerName: "Meal Name", width: 150 },
     {
       field: "empContribution",
@@ -83,10 +83,21 @@ const getCanteenReportColumns = () => {
     { field: "employeeNo", headerName: "Employee No", width: 150 },
     { field: "employeeName", headerName: "Employee Name", width: 150 },
     { field: "quantity", headerName: "Quantity", width: 150 },
-    { field: "price", headerName: "Total Price", width: 150 }, 
-    { field: "employerContribution", headerName: "Employer Contribution", width: 150 },
-    { field: "employeeContribution", headerName: "Employee Contribution", width: 150 },
-   
+    { field: "price", headerName: "Total Price", width: 150 },
+    {
+      field: "employerContribution",
+      headerName: "Employer Contribution",
+      width: 150,
+    },
+    {
+      field: "employeeContribution",
+      headerName: "Employee Contribution",
+      width: 150,
+    },
+    { field: "shift", headerName: "Shift", width: 120 },
+    { field: "inTime", headerName: "In Time", width: 120 },
+    { field: "remark", headerName: "Remark", width: 150 },
+    { field: "contact", headerName: "Phone Number", width: 150 },
   ];
 };
 
@@ -101,7 +112,7 @@ const getVisitorRequestColumns = () => {
     { field: "visitorCount", headerName: "Visitor Count", width: 150 },
     { field: "visitorEmail", headerName: "Email", width: 150 },
     { field: "purpose", headerName: "Purpose", width: 150 },
-  
+
     { field: "host", headerName: "Host", width: 150 },
     { field: "photo", headerName: "Photo", width: 150 },
     { field: "createdAt", headerName: "Created At", width: 150 },
